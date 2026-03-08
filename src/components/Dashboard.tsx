@@ -177,7 +177,10 @@ export default function Dashboard() {
     const totalDischarge = days.reduce((s, r) => s + num(r.Akku_Entladen_kWh), 0);
     const totalHeat      = days.reduce((s, r) => s + num(r.Heizung_kWh), 0);
     const totalCar       = days.reduce((s, r) => s + num(r.E_Auto_Ladung_kWh), 0);
-    const totalKm        = days.reduce((s, r) => s + num(r.Auto_km_Tag), 0);
+    // Km: Odometer-Differenz (letzter − erster Wert im Monat, da Auto_km_Tag kumulativ)
+    const firstKm        = num(days[0]?.Auto_Kilometerstand);
+    const lastKm         = num(days[days.length - 1]?.Auto_Kilometerstand);
+    const totalKm        = Math.max(0, lastKm - firstKm);
     const totalKosten    = days.reduce((s, r) => s + num(r.Kosten_Euro), 0);
 
     const totalSelf = totalPV + totalDischarge;
@@ -366,6 +369,10 @@ export default function Dashboard() {
               <div className="text-center pt-1">
                 <div className="text-[10px] uppercase text-slate-500 font-bold">Speicher-Inhalt</div>
                 <div className="text-2xl font-black text-violet-300">{fmt(accuContent)} <span className="text-sm">kWh</span></div>
+                {/* Nutzbar: oberhalb 12% × 2 × 5,12 kWh = 1,23 kWh Untergrenze */}
+                <div className="text-[9px] text-slate-500 mt-0.5">
+                  nutzbar: {fmt(Math.max(0, accuContent - 1.23))} kWh · max 10,24 kWh
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">

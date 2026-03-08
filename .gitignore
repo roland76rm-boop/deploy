@@ -7,3 +7,5 @@ coverage/
 .env*
 !.env.example
 start-server.cmd
+
+.vercel
