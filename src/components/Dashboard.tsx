@@ -118,6 +118,16 @@ function getDailyFinal(rows: EnergyData[]): EnergyData[] {
   });
 }
 
+/** Max-Speicher-SOC pro Tag aus allen Stundenwerten (nicht nur Tagesendwert) */
+function getDailyMaxSOC(rows: EnergyData[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    const soc = num(row.Speicher_Inhalt_SOC_kWh);
+    map.set(row.Datum, Math.max(map.get(row.Datum) ?? 0, soc));
+  }
+  return map;
+}
+
 function getMonthStats(days: EnergyData[]) {
   const n = Math.max(days.length, 1);
   const sum = (k: keyof EnergyData) => days.reduce((s, r) => s + num(r[k] as string), 0);
@@ -293,11 +303,13 @@ function Lightbox({ data, onClose }: { data: LightboxData; onClose: () => void }
 
 // ─── Energie Tab ──────────────────────────────────────────────────────────────
 
-function EnergieTab({ stats, days, onDayClick }: {
-  stats: ReturnType<typeof getMonthStats>; days: EnergyData[]; onDayClick: (d: EnergyData) => void;
+function EnergieTab({ stats, days, monthRows, onDayClick }: {
+  stats: ReturnType<typeof getMonthStats>; days: EnergyData[]; monthRows: EnergyData[]; onDayClick: (d: EnergyData) => void;
 }) {
   const { t, ts, gc, ac, cc } = useTheme();
   if (!days.length) return <Card><p className={`text-center py-8 ${t('text-slate-500','text-gray-400')}`}>Keine Daten.</p></Card>;
+
+  const dailyMaxSOC = useMemo(() => getDailyMaxSOC(monthRows), [monthRows]);
 
   const bestPV   = days.reduce((b,r) => num(r.PV_Ertrag_kWh) > num(b.PV_Ertrag_kWh) ? r : b, days[0]);
   const mostGrid = days.reduce((b,r) => num(r.Netzbezug_kWh) > num(b.Netzbezug_kWh) ? r : b, days[0]);
@@ -305,7 +317,8 @@ function EnergieTab({ stats, days, onDayClick }: {
   const highFeed = days.reduce((b,r) => num(r.Netz_Einspeisung_kWh) > num(b.Netz_Einspeisung_kWh) ? r : b, days[0]);
 
   const chartData = days.map(r => ({ tag: r.Datum.substring(0,5), PV: num(r.PV_Ertrag_kWh), Netz: num(r.Netzbezug_kWh),
-    Einspeisung: num(r.Netz_Einspeisung_kWh), Kosten: num(r.Kosten_Euro), Akku: num(r.Speicher_Inhalt_SOC_kWh), _row: r }));
+    Einspeisung: num(r.Netz_Einspeisung_kWh), Kosten: num(r.Kosten_Euro),
+    Akku: dailyMaxSOC.get(r.Datum) ?? num(r.Speicher_Inhalt_SOC_kWh), _row: r }));
 
   const appData = [
     { name: 'Heizung',        value: days.reduce((s,r)=>s+num(r.Heizung_kWh),0),         color: '#f97316' },
@@ -692,12 +705,13 @@ export default function Dashboard() {
     });
   }, [allData]);
 
-  const { monthRows, days, stats, monthLabel } = useMemo(() => {
-    if (!allData.length || !selectedMonthKey) return { monthRows:[], days:[], stats:null, monthLabel:'' };
+  const { monthRows, days, stats, monthLabel, dailyMaxSOC } = useMemo(() => {
+    if (!allData.length || !selectedMonthKey) return { monthRows:[], days:[], stats:null, monthLabel:'', dailyMaxSOC: new Map<string,number>() };
     const [m,y] = selectedMonthKey.split('.');
     const monthRows = allData.filter(r => { const [,rm,ry]=r.Datum.split('.'); return rm===m && ry===y; });
     const days = getDailyFinal(monthRows);
-    return { monthRows, days, stats: getMonthStats(days), monthLabel: `${MONTHS_DE[parseInt(m)-1]} ${y}` };
+    const dailyMaxSOC = getDailyMaxSOC(monthRows);
+    return { monthRows, days, stats: getMonthStats(days), monthLabel: `${MONTHS_DE[parseInt(m)-1]} ${y}`, dailyMaxSOC };
   }, [allData, selectedMonthKey]);
 
   // Reset day when month changes
@@ -751,7 +765,7 @@ export default function Dashboard() {
 
   const overviewData = days.map(r => ({
     tag: r.Datum.substring(0,5), PV: num(r.PV_Ertrag_kWh), Netz: num(r.Netzbezug_kWh),
-    Akku: num(r.Speicher_Inhalt_SOC_kWh), _row: r,
+    Akku: dailyMaxSOC.get(r.Datum) ?? num(r.Speicher_Inhalt_SOC_kWh), _row: r,
   }));
   const ovClick = (d: any) => { const r=d?.activePayload?.[0]?.payload?._row; if(r) handleDayClick(r); };
 
@@ -844,6 +858,60 @@ export default function Dashboard() {
                   <StatCard label="PV-Ersparnis" value={fmt(stats.pvSavings,2)}   unit="€"    icon="💰" color={cc('green')}   sub={`+ ${fmt(stats.feedRevenue,2)} € Einspeisung`} />
                 </div>
               </section>
+
+              {/* ── Monats-Highlights ── */}
+              {(() => {
+                // Bester PV-Tag
+                const bestPV = days.reduce((b,r) => num(r.PV_Ertrag_kWh)>num(b.PV_Ertrag_kWh)?r:b, days[0]);
+                // Günstigster Tag
+                const cheapDay = days.reduce((b,r) => num(r.Kosten_Euro)<num(b.Kosten_Euro)?r:b, days[0]);
+                // Höchster Akku-Stand (Tagesmax)
+                const maxSOCEntry = days.reduce((b,r) => {
+                  const soc = dailyMaxSOC.get(r.Datum)??0;
+                  return soc > (dailyMaxSOC.get(b.Datum)??0) ? r : b;
+                }, days[0]);
+                const maxSOCVal = dailyMaxSOC.get(maxSOCEntry?.Datum??'')??0;
+                // Bester Autarkie-Tag
+                const autarkyDay = (r: EnergyData) => {
+                  const s = num(r.PV_Ertrag_kWh)+num(r.Akku_Entladen_kWh);
+                  const a = s+num(r.Netzbezug_kWh);
+                  return a>0 ? (s/a)*100 : 0;
+                };
+                const bestAutarky = days.reduce((b,r) => autarkyDay(r)>autarkyDay(b)?r:b, days[0]);
+                // Wärmster Tag
+                const hottestDay = days.reduce((b,r) => num(r.Temp_Aussen)>num(b.Temp_Aussen)?r:b, days[0]);
+                // Meiste Einspeisung
+                const bestFeed = days.reduce((b,r) => num(r.Netz_Einspeisung_kWh)>num(b.Netz_Einspeisung_kWh)?r:b, days[0]);
+                // Roboter Gesamtfläche
+                const totalRobot = days.reduce((s,r) => s+num(r.Roboter_Flaeche_m2), 0);
+                // Meiste km Tag
+                const kmByDay = days.map((r,i) => ({
+                  datum: r.Datum, km: i===0?0:Math.max(0,num(r.Auto_Kilometerstand)-num(days[i-1].Auto_Kilometerstand))
+                }));
+                const mostKmDay = kmByDay.reduce((b,r) => r.km>b.km?r:b, kmByDay[0]??{datum:'',km:0});
+
+                const row1 = [
+                  { icon:'☀️', label:'Bester PV-Tag',     value:`${fmt(num(bestPV?.PV_Ertrag_kWh))} kWh`,  sub: bestPV?.Datum },
+                  { icon:'🔋', label:'Akku-Maximum',       value:`${fmt(maxSOCVal)} kWh`,                    sub: maxSOCEntry?.Datum },
+                  { icon:'🏡', label:'Bester Autarkie-Tag',value:`${fmt(autarkyDay(bestAutarky),0)}%`,        sub: bestAutarky?.Datum },
+                  { icon:'💸', label:'Günstigster Tag',    value: eur(num(cheapDay?.Kosten_Euro)),            sub: cheapDay?.Datum },
+                ];
+                const row2 = [
+                  { icon:'🌡️', label:'Wärmster Tag',       value:`${fmt(num(hottestDay?.Temp_Aussen))}°C`,   sub: hottestDay?.Datum },
+                  { icon:'⬆️', label:'Meist Eingespeist',  value:`${fmt(num(bestFeed?.Netz_Einspeisung_kWh))} kWh`, sub: bestFeed?.Datum },
+                  { icon:'🧹', label:'Roboter Monat',      value:`${fmt(totalRobot,0)} m²`,                  sub:'Gesamtfläche' },
+                  { icon:'🚗', label:'Meiste km/Tag',      value:`${fmt(mostKmDay.km,0)} km`,                sub: mostKmDay.datum?.substring(0,5) || '–' },
+                ];
+                return (
+                  <section className="space-y-3">
+                    <h2 className={`text-[10px] font-black uppercase tracking-widest ${t('text-slate-500','text-gray-400')}`}>
+                      ✨ Monats-Highlights · {monthLabel}
+                    </h2>
+                    <HighlightStrip items={row1} />
+                    <HighlightStrip items={row2} />
+                  </section>
+                );
+              })()}
 
               {/* KI-Analyse */}
               <section>
@@ -973,7 +1041,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {activeTab === 'energie'      && <EnergieTab stats={stats} days={days} onDayClick={handleDayClick} />}
+          {activeTab === 'energie'      && <EnergieTab stats={stats} days={days} monthRows={monthRows} onDayClick={handleDayClick} />}
           {activeTab === 'auto'         && <AutoTab    stats={stats} days={days} onDayClick={handleDayClick} />}
           {activeTab === 'temperaturen' && <TemperaturenTab days={days} onDayClick={handleDayClick} />}
           {activeTab === 'tagesansicht' && (
