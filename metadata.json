@@ -1,0 +1,5 @@
+{
+  "name": "Energy Dashboard",
+  "description": "A comprehensive dashboard displaying energy consumption and production data from a Google Sheet.",
+  "requestFramePermissions": []
+}
