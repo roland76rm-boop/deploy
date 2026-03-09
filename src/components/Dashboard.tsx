@@ -753,13 +753,74 @@ function getDailyLastEntry(rows: EnergyData[]): EnergyData[] {
     return ms(a) - ms(b);
   });
 }
-function TagesansichtTab({ monthRows, days, onDayClick }: {
+function TagesansichtTab({ monthRows, days, onDayClick, heuteFilter = false }: {
   monthRows: EnergyData[];
   days: EnergyData[];
   onDayClick: (d: EnergyData) => void;
+  heuteFilter?: boolean;
 }) {
   const { t } = useTheme();
   const dailyLast = useMemo(() => getDailyLastEntry(monthRows), [monthRows]);
+
+  // Im Heute-Modus: Stundenwerte als Tabelle zeigen
+  if (heuteFilter) {
+    const todayLabel = monthRows[0]?.Datum ?? '';
+    const wochentag  = monthRows[0]?.Wochentag ?? '';
+    const hourRows = [...monthRows].sort((a, b) => a.created < b.created ? -1 : 1);
+    return (
+      <div className="space-y-4">
+        <div className={`text-[10px] font-bold uppercase tracking-widest ${t('text-slate-500','text-gray-400')}`}>
+          Stundenwerte · Heute · {todayLabel} {wochentag} · {hourRows.length} Einträge
+        </div>
+        {hourRows.length === 0 ? (
+          <Card><p className={`text-center py-8 ${t('text-slate-500','text-gray-400')}`}>Keine Daten für heute.</p></Card>
+        ) : (
+          <Card className="!p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className={`border-b ${t('border-slate-800 bg-slate-900/40','border-gray-200 bg-gray-50')}`}>
+                    {TAGES_COLS.map(c => (
+                      <th key={String(c.key)} className={`text-left px-4 py-3 text-[9px] font-black uppercase tracking-widest whitespace-nowrap ${t('text-slate-500','text-gray-400')}`}>{c.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {hourRows.map((row, i) => (
+                    <tr
+                      key={i}
+                      onClick={() => onDayClick(row)}
+                      className={`border-b cursor-pointer transition-colors ${t('border-slate-800/40 hover:bg-slate-800/40','border-gray-100 hover:bg-emerald-50')} ${i % 2 === 0 ? '' : t('bg-slate-800/15','bg-gray-50/60')}`}
+                    >
+                      {TAGES_COLS.map(col => {
+                        let display = '';
+                        if (col.key === 'created') {
+                          display = String(row[col.key] ?? '').substring(11, 16);
+                        } else if (col.key === 'Datum') {
+                          display = String(row[col.key] ?? '').substring(0, 5) + ' ' + (row.Wochentag ?? '');
+                        } else {
+                          const v = num(row[col.key] as string);
+                          display = `${fmt(v, col.unit === '€' ? 2 : 1)}${col.unit}`;
+                        }
+                        return (
+                          <td key={String(col.key)} className={`px-4 py-2 font-bold whitespace-nowrap ${col.color || t('text-slate-400','text-gray-700')}`}>
+                            {display}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className={`px-4 py-2 border-t text-[9px] ${t('border-slate-800 text-slate-600','border-gray-100 text-gray-400')}`}>
+              💡 Klick auf eine Zeile öffnet die Detailansicht · Stundenwerte des heutigen Tages
+            </div>
+          </Card>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -815,6 +876,7 @@ function TagesansichtTab({ monthRows, days, onDayClick }: {
     </div>
   );
 }
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
@@ -841,6 +903,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab]           = useState<TabId>('uebersicht');
   const [selectedMonthKey, setSelectedMonthKey] = useState('');
   const [selectedDay, setSelectedDay]       = useState('');
+  const [heuteFilter, setHeuteFilter] = useState(false);
   const [lightbox, setLightbox]             = useState<LightboxData | null>(null);
 
   useEffect(() => {
@@ -886,6 +949,18 @@ export default function Dashboard() {
     return { monthRows, days, stats: getMonthStats(days), monthLabel: `${MONTHS_DE[parseInt(m)-1]} ${y}`, dailyMaxSOC };
   }, [allData, selectedMonthKey]);
 
+  // ── Heute-Filter ──
+  const todayDatum = useMemo(() => allData.length ? allData[allData.length - 1].Datum : '', [allData]);
+  const heuteRows  = useMemo(() => todayDatum ? allData.filter(r => r.Datum === todayDatum).sort((a,b) => a.created < b.created ? -1 : 1) : [], [allData, todayDatum]);
+  const heuteDays  = useMemo(() => getDailyFinal(heuteRows), [heuteRows]);
+  const heuteStats = useMemo(() => heuteDays.length ? getMonthStats(heuteDays) : null, [heuteDays]);
+  const heuteMaxSOC= useMemo(() => getDailyMaxSOC(heuteRows), [heuteRows]);
+  const activeMonthRows  = heuteFilter ? heuteRows   : monthRows;
+  const activeDays       = heuteFilter ? heuteDays   : days;
+  const activeStats      = heuteFilter ? (heuteStats ?? stats) : stats;
+  const activeDailyMaxSOC= heuteFilter ? heuteMaxSOC : dailyMaxSOC;
+  const activeLabel      = heuteFilter ? `Heute \u00b7 ${todayDatum}` : monthLabel;
+
   // Reset day when month changes
   useEffect(() => {
     if (days.length > 0) setSelectedDay(days[days.length-1].Datum);
@@ -930,12 +1005,17 @@ export default function Dashboard() {
   );
 
   if (!stats || !latest) return null;
+  // Active data alias for render
+  const renderStats = activeStats;
+  const renderDays = activeDays;
+  const renderMonthRows = activeMonthRows;
+
 
   const accu1 = num(latest.SOC_Akku1_Proz), accu2 = num(latest.SOC_Akku2_Proz);
   const accuContent = num(latest.Speicher_Inhalt_SOC_kWh);
   const axTick = { fontSize: 9, fill: ac, fontWeight: 700 };
 
-  const overviewData = days.map(r => ({
+  const overviewData = activeDays.map(r => ({
     tag: r.Datum.substring(0,5), PV: num(r.PV_Ertrag_kWh), Netz: num(r.Netzbezug_kWh),
     Akku: dailyMaxSOC.get(r.Datum) ?? num(r.Speicher_Inhalt_SOC_kWh), _row: r,
   }));
@@ -971,7 +1051,19 @@ export default function Dashboard() {
                 <span className={`text-[10px] font-bold uppercase ${t('text-slate-400','text-gray-500')}`}>Live · {lastUpdated}</span>
               </div>
 
-              {/* Month filter */}
+              {/* Heute-Filter */}
+          <button
+            onClick={() => setHeuteFilter(h => !h)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition-all ${
+              heuteFilter
+                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+                : t('bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700','bg-gray-100 text-gray-600 hover:bg-gray-200')
+            }`}
+            title="Nur Daten von heute anzeigen"
+          >
+            <span>📅</span><span>Heute</span>
+          </button>
+          {/* Month filter */}
               <select value={selectedMonthKey} onChange={e => setSelectedMonthKey(e.target.value)}
                 className={`${selStyle} text-[11px] font-bold rounded-lg px-3 py-1.5 outline-none cursor-pointer`}>
                 {availableMonths.map(mk => {
@@ -1021,50 +1113,50 @@ export default function Dashboard() {
             <div className="space-y-8">
               <section>
                 <h2 className={`text-[10px] font-black uppercase tracking-widest mb-4 ${t('text-slate-500','text-gray-400')}`}>
-                  Monatsübersicht · {monthLabel} · {stats.daysCount} Tage erfasst
+                  Monatsübersicht · {activeLabel} · {activeStats.daysCount} Tage erfasst
                 </h2>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <StatCard label="Stromkosten"  value={fmt(stats.totalKosten,2)} unit="€"   icon="🧾" color={cc('rose')}    sub={`∅ ${fmt(stats.totalKosten/stats.daysCount,2)} €/Tag`} />
-                  <StatCard label="PV Ertrag"    value={fmt(stats.totalPV)}       unit="kWh"  icon="☀️" color={cc('amber')}   sub={`∅ ${fmt(stats.totalPV/stats.daysCount)} kWh/Tag`} />
-                  <StatCard label="Autarkiegrad" value={fmt(stats.autarky,0)}     unit="%"    icon="🏡" color={cc(stats.autarky>=50?'emerald':'slate')} sub={`Netzbezug ${fmt(stats.totalGrid)} kWh`} />
-                  <StatCard label="PV-Ersparnis" value={fmt(stats.pvSavings,2)}   unit="€"    icon="💰" color={cc('green')}   sub={`+ ${fmt(stats.feedRevenue,2)} € Einspeisung`} />
+                  <StatCard label="Stromkosten"  value={fmt(activeStats.totalKosten,2)} unit="€"   icon="🧾" color={cc('rose')}    sub={`∅ ${fmt(activeStats.totalKosten/activeStats.daysCount,2)} €/Tag`} />
+                  <StatCard label="PV Ertrag"    value={fmt(activeStats.totalPV)}       unit="kWh"  icon="☀️" color={cc('amber')}   sub={`∅ ${fmt(activeStats.totalPV/activeStats.daysCount)} kWh/Tag`} />
+                  <StatCard label="Autarkiegrad" value={fmt(activeStats.autarky,0)}     unit="%"    icon="🏡" color={cc(activeStats.autarky>=50?'emerald':'slate')} sub={`Netzbezug ${fmt(activeStats.totalGrid)} kWh`} />
+                  <StatCard label="PV-Ersparnis" value={fmt(activeStats.pvSavings,2)}   unit="€"    icon="💰" color={cc('green')}   sub={`+ ${fmt(activeStats.feedRevenue,2)} € Einspeisung`} />
                 </div>
               </section>
 
               {/* ── Monats-Highlights ── */}
               {(() => {
                 // Bester PV-Tag
-                const bestPV = days.reduce((b,r) => num(r.PV_Ertrag_kWh)>num(b.PV_Ertrag_kWh)?r:b, days[0]);
+                const bestPV = activeDays.reduce((b,r) => num(r.PV_Ertrag_kWh)>num(b.PV_Ertrag_kWh)?r:b, activeDays[0]);
                 // Günstigster Tag
-                const cheapDay = days.reduce((b,r) => num(r.Kosten_Euro)<num(b.Kosten_Euro)?r:b, days[0]);
+                const cheapDay = activeDays.reduce((b,r) => num(r.Kosten_Euro)<num(b.Kosten_Euro)?r:b, activeDays[0]);
                 // Höchster Akku-Stand (Tagesmax)
-                const maxSOCEntry = days.reduce((b,r) => {
-                  const soc = dailyMaxSOC.get(r.Datum)??0;
-                  return soc > (dailyMaxSOC.get(b.Datum)??0) ? r : b;
-                }, days[0]);
-                const maxSOCVal = dailyMaxSOC.get(maxSOCEntry?.Datum??'')??0;
+                const maxSOCEntry = activeDays.reduce((b,r) => {
+                  const soc = activeDailyMaxSOC.get(r.Datum)??0;
+                  return soc > (activeDailyMaxSOC.get(b.Datum)??0) ? r : b;
+                }, activeDays[0]);
+                const maxSOCVal = activeDailyMaxSOC.get(maxSOCEntry?.Datum??'')??0;
                 // Bester Autarkie-Tag
                 const autarkyDay = (r: EnergyData) => {
                   const s = num(r.PV_Ertrag_kWh)+num(r.Akku_Entladen_kWh);
                   const a = s+num(r.Netzbezug_kWh);
                   return a>0 ? (s/a)*100 : 0;
                 };
-                const bestAutarky = days.reduce((b,r) => autarkyDay(r)>autarkyDay(b)?r:b, days[0]);
+                const bestAutarky = activeDays.reduce((b,r) => autarkyDay(r)>autarkyDay(b)?r:b, activeDays[0]);
                 // Wärmster Tag
-                const _ovMaxTemp = getDailyMaxTemp(monthRows);
-        const hottestDay = days.reduce((b, r) => {
+                const _ovMaxTemp = getDailyMaxTemp(activeMonthRows);
+        const hottestDay = activeDays.reduce((b, r) => {
           const mxB = _ovMaxTemp.get(b.Datum) ?? num(b.Temp_Aussen);
           const mxR = _ovMaxTemp.get(r.Datum) ?? num(r.Temp_Aussen);
           return mxR > mxB ? r : b;
-        }, days[0]);
+        }, activeDays[0]);
         const _hottestDayVal = _ovMaxTemp.get(hottestDay?.Datum ?? '') ?? num(hottestDay?.Temp_Aussen ?? '');
                 // Meiste Einspeisung
-                const bestFeed = days.reduce((b,r) => num(r.Netz_Einspeisung_kWh)>num(b.Netz_Einspeisung_kWh)?r:b, days[0]);
+                const bestFeed = activeDays.reduce((b,r) => num(r.Netz_Einspeisung_kWh)>num(b.Netz_Einspeisung_kWh)?r:b, activeDays[0]);
                 // Roboter Gesamtfläche
-                const totalRobot = days.reduce((s,r) => s+num(r.Roboter_Flaeche_m2), 0);
+                const totalRobot = activeDays.reduce((s,r) => s+num(r.Roboter_Flaeche_m2), 0);
                 // Meiste km Tag
-                const kmByDay = days.map((r,i) => ({
-                  datum: r.Datum, km: i===0?0:Math.max(0,num(r.Auto_Kilometerstand)-num(days[i-1].Auto_Kilometerstand))
+                const kmByDay = activeDays.map((r,i) => ({
+                  datum: r.Datum, km: i===0?0:Math.max(0,num(r.Auto_Kilometerstand)-num(activeDays[i-1].Auto_Kilometerstand))
                 }));
                 const mostKmDay = kmByDay.reduce((b,r) => r.km>b.km?r:b, kmByDay[0]??{datum:'',km:0});
 
@@ -1083,7 +1175,7 @@ export default function Dashboard() {
                 return (
                   <section className="space-y-3">
                     <h2 className={`text-[10px] font-black uppercase tracking-widest ${t('text-slate-500','text-gray-400')}`}>
-                      ✨ Monats-Highlights · {monthLabel}
+                      ✨ Monats-Highlights · {activeLabel}
                     </h2>
                     <HighlightStrip items={row1} />
                     <HighlightStrip items={row2} />
@@ -1093,7 +1185,7 @@ export default function Dashboard() {
 
               {/* KI-Analyse */}
               <section>
-                <h2 className={`text-[10px] font-black uppercase tracking-widest mb-4 ${t('text-slate-500','text-gray-400')}`}>🤖 KI-Monatsanalyse · {monthLabel}</h2>
+                <h2 className={`text-[10px] font-black uppercase tracking-widest mb-4 ${t('text-slate-500','text-gray-400')}`}>🤖 KI-Monatsanalyse · {activeLabel}</h2>
                 <div className={`${t('bg-slate-900/60 border-emerald-900/40','bg-emerald-50 border-emerald-200')} border rounded-2xl p-5 space-y-3`}>
                   {insights.map((ins, i) => (
                     <div key={i} className="flex gap-3 items-start">
@@ -1107,7 +1199,7 @@ export default function Dashboard() {
               {/* Highlight Cards */}
               <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Energie-Bilanz */}
-                <div className={`rounded-2xl p-5 border ${stats.netBalance >= 0
+                <div className={`rounded-2xl p-5 border ${activeStats.netBalance >= 0
                   ? t('bg-emerald-950/40 border-emerald-700/30','bg-emerald-50 border-emerald-200')
                   : t('bg-slate-800/60 border-slate-700/50','bg-white border-gray-200')}`}>
                   <div className="flex items-center gap-2 mb-3">
@@ -1115,17 +1207,17 @@ export default function Dashboard() {
                     <span className={`text-[11px] font-black uppercase tracking-widest opacity-60`}>Energie-Bilanz</span>
                   </div>
                   <div className={`divide-y ${t('divide-white/5','divide-gray-100')}`}>
-                    <Pill label="PV Ertrag"    value={`${fmt(stats.totalPV)} kWh`}   color="text-amber-500" />
-                    <Pill label="Netzbezug"    value={`${fmt(stats.totalGrid)} kWh`}  color="text-rose-500" />
-                    <Pill label="Einspeisung"  value={`${fmt(stats.totalFeed)} kWh`}  color="text-sky-500" />
-                    <Pill label="Akku geladen" value={`${fmt(stats.totalCharge)} kWh`}color="text-violet-500" />
-                    <Pill label="Akku entladen"value={`${fmt(stats.totalDischarge)} kWh`}color="text-violet-400" />
+                    <Pill label="PV Ertrag"    value={`${fmt(activeStats.totalPV)} kWh`}   color="text-amber-500" />
+                    <Pill label="Netzbezug"    value={`${fmt(activeStats.totalGrid)} kWh`}  color="text-rose-500" />
+                    <Pill label="Einspeisung"  value={`${fmt(activeStats.totalFeed)} kWh`}  color="text-sky-500" />
+                    <Pill label="Akku geladen" value={`${fmt(activeStats.totalCharge)} kWh`}color="text-violet-500" />
+                    <Pill label="Akku entladen"value={`${fmt(activeStats.totalDischarge)} kWh`}color="text-violet-400" />
                   </div>
-                  <div className={`mt-4 p-3 rounded-xl text-center ${stats.netBalance>=0
+                  <div className={`mt-4 p-3 rounded-xl text-center ${activeStats.netBalance>=0
                     ? t('bg-emerald-500/10 text-emerald-400','bg-emerald-100 text-emerald-700')
                     : t('bg-rose-500/10 text-rose-400','bg-rose-100 text-rose-700')}`}>
                     <div className="text-[10px] uppercase font-black tracking-widest opacity-60">Netto-Bilanz</div>
-                    <div className="text-xl font-black mt-0.5">{stats.netBalance>=0?'+':''}{eur(stats.netBalance)}</div>
+                    <div className="text-xl font-black mt-0.5">{activeStats.netBalance>=0?'+':''}{eur(activeStats.netBalance)}</div>
                   </div>
                 </div>
 
@@ -1178,8 +1270,8 @@ export default function Dashboard() {
                     <span className="text-2xl font-black text-blue-600">{latest.Auto_Reichweite_km} <span className="text-sm">km</span></span>
                   </div>
                   <div className={`divide-y ${t('divide-white/5','divide-gray-100')}`}>
-                    <Pill label="Geladene Energie (Monat)" value={`${fmt(stats.totalCar)} kWh`}  color="text-blue-600" />
-                    <Pill label="Gefahrene km (Monat)"     value={`${fmt(stats.totalKm,0)} km`}   color="text-blue-500" />
+                    <Pill label="Geladene Energie (Monat)" value={`${fmt(activeStats.totalCar)} kWh`}  color="text-blue-600" />
+                    <Pill label="Gefahrene km (Monat)"     value={`${fmt(activeStats.totalKm,0)} km`}   color="text-blue-500" />
                     <Pill label="Kilometerstand"           value={`${parseInt(latest.Auto_Kilometerstand||'0').toLocaleString('de-AT')} km`} color={t('text-slate-300','text-gray-600')} />
                   </div>
                 </div>
@@ -1219,11 +1311,11 @@ export default function Dashboard() {
             </div>
           )}
 
-          {activeTab === 'energie'      && <EnergieTab stats={stats} days={days} monthRows={monthRows} onDayClick={handleDayClick} />}
-          {activeTab === 'auto'         && <AutoTab    stats={stats} days={days} onDayClick={handleDayClick} />}
-          {activeTab === 'temperaturen' && <TemperaturenTab days={days} monthRows={monthRows} onDayClick={handleDayClick} />}
+          {activeTab === 'energie'      && <EnergieTab stats={activeStats} days={activeDays} monthRows={activeMonthRows} onDayClick={handleDayClick} />}
+          {activeTab === 'auto'         && <AutoTab stats={activeStats} days={activeDays} onDayClick={handleDayClick} />}
+          {activeTab === 'temperaturen' && <TemperaturenTab days={activeDays} monthRows={activeMonthRows} onDayClick={handleDayClick} />}
           {activeTab === 'tagesansicht' && (
-            <TagesansichtTab monthRows={monthRows} days={days} onDayClick={handleDayClick} />
+            <TagesansichtTab monthRows={activeMonthRows} days={activeDays} onDayClick={handleDayClick} heuteFilter={heuteFilter} />
           )}
         </main>
 
