@@ -718,82 +718,103 @@ function TemperaturenTab({ days, monthRows, onDayClick }: {
     </div>
   );
 }
-// ─── Tagesansicht Tab ─────────────────────────────────────────────────────────
-
-const TABLE_COLS: { label: string; key: keyof EnergyData; unit: string; color: string }[] = [
-  { label:'Uhrzeit',   key:'created',                      unit:'',    color:'' },
-  { label:'PV',        key:'PV_Ertrag_kWh',                unit:'kWh', color:'text-amber-600' },
-  { label:'Netz',      key:'Netzbezug_kWh',                unit:'kWh', color:'text-rose-600' },
-  { label:'Einspeis.', key:'Netz_Einspeisung_kWh',         unit:'kWh', color:'text-sky-600' },
-  { label:'Kosten',    key:'Kosten_Euro',                  unit:'€',   color:'text-red-600' },
-  { label:'SOC kWh',   key:'Speicher_Inhalt_SOC_kWh',      unit:'kWh', color:'text-violet-600' },
-  { label:'Hausverbr.',key:'Hausverbrauch_Berechnet_kWh',  unit:'kWh', color:'text-gray-600' },
-  { label:'Heizung',   key:'Heizung_kWh',                  unit:'kWh', color:'text-orange-600' },
-  { label:'E-Auto',    key:'E_Auto_Ladung_kWh',            unit:'kWh', color:'text-blue-600' },
-  { label:'Außen °C',  key:'Temp_Aussen',                  unit:'°',   color:'text-cyan-600' },
-  { label:'Prognose',  key:'PV_Prognose_Heute_kWh',        unit:'kWh', color:'text-amber-500' },
-  { label:'Roboter m²',key:'Roboter_Flaeche_m2',           unit:'m²',  color:'text-teal-600' },
+// ─── Tagesansicht Tab ───────────────────────────────────────────────────
+// Spalten für die Tagesabschluss-Tabelle
+const TAGES_COLS: { label: string; key: keyof EnergyData; unit: string; color: string }[] = [
+  { label:'Datum',      key:'Datum',                       unit:'',    color:'' },
+  { label:'Uhrzeit',    key:'created',                     unit:'',    color:'' },
+  { label:'PV',         key:'PV_Ertrag_kWh',               unit:'kWh', color:'text-amber-600' },
+  { label:'Netz',       key:'Netzbezug_kWh',               unit:'kWh', color:'text-rose-600' },
+  { label:'Einspeis.',  key:'Netz_Einspeisung_kWh',        unit:'kWh', color:'text-sky-600' },
+  { label:'Kosten',     key:'Kosten_Euro',                 unit:'€',   color:'text-red-600' },
+  { label:'SOC kWh',    key:'Speicher_Inhalt_SOC_kWh',    unit:'kWh', color:'text-violet-600' },
+  { label:'Hausverbr.', key:'Hausverbrauch_Berechnet_kWh', unit:'kWh', color:'text-gray-600' },
+  { label:'Heizung',    key:'Heizung_kWh',                 unit:'kWh', color:'text-orange-600' },
+  { label:'E-Auto',     key:'E_Auto_Ladung_kWh',           unit:'kWh', color:'text-blue-600' },
+  { label:'Außen °C',   key:'Temp_Aussen',                 unit:'°',   color:'text-cyan-600' },
+  { label:'Prognose',   key:'PV_Prognose_Heute_kWh',       unit:'kWh', color:'text-amber-500' },
+  { label:'Roboter m²', key:'Roboter_Flaeche_m2',          unit:'m²',  color:'text-teal-600' },
 ];
 
-function TagesansichtTab({ monthRows, days, selectedDay, setSelectedDay }: {
-  monthRows: EnergyData[]; days: EnergyData[]; selectedDay: string; setSelectedDay: (d: string) => void;
+/** Letzten Wert pro Tag vor der Zurücksetzung (= höchster created-Timestamp des Tages) */
+function getDailyLastEntry(rows: EnergyData[]): EnergyData[] {
+  const map = new Map<string, EnergyData>();
+  for (const row of rows) {
+    const existing = map.get(row.Datum);
+    if (!existing || row.created > existing.created) {
+      map.set(row.Datum, row);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    const ms = (r: EnergyData) => {
+      const [d, m, y] = r.Datum.split('.').map(Number);
+      return new Date(y, m - 1, d).getTime();
+    };
+    return ms(a) - ms(b);
+  });
+}
+function TagesansichtTab({ monthRows, days, onDayClick }: {
+  monthRows: EnergyData[];
+  days: EnergyData[];
+  onDayClick: (d: EnergyData) => void;
 }) {
   const { t } = useTheme();
-  const dayRows = monthRows.filter(r => r.Datum === selectedDay).sort((a,b) => a.created < b.created ? -1 : 1);
+  const dailyLast = useMemo(() => getDailyLastEntry(monthRows), [monthRows]);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 flex-wrap">
-        <span className={`text-[10px] font-black uppercase tracking-widest mt-2 ${t('text-slate-500','text-gray-400')}`}>Tag wählen:</span>
-        <div className="flex gap-2 flex-wrap">
-          {days.map(d => (
-            <button key={d.Datum} onClick={() => setSelectedDay(d.Datum)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                d.Datum === selectedDay ? 'bg-emerald-600 text-white shadow-md'
-                : t('bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700',
-                     'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900')
-              }`}>
-              {d.Datum.substring(0,5)}
-            </button>
-          ))}
-        </div>
+      <div className={`text-[10px] font-bold uppercase tracking-widest ${t('text-slate-500','text-gray-400')}`}>
+        Tagesabschluss-Werte · {dailyLast.length} Tage · letzter erfasster Eintrag pro Tag vor Zurücksetzung
       </div>
-      {dayRows.length === 0 ? (
-        <Card><p className={`text-center py-8 ${t('text-slate-500','text-gray-400')}`}>Kein Tag ausgewählt oder keine Daten.</p></Card>
+      {dailyLast.length === 0 ? (
+        <Card><p className={`text-center py-8 ${t('text-slate-500','text-gray-400')}`}>Keine Daten.</p></Card>
       ) : (
         <Card className="!p-0 overflow-hidden">
-          <div className="p-5 pb-3 border-b ${t('border-slate-800','border-gray-200')}">
-            <SectionHeader>Stundenwerte · {selectedDay} · {dayRows[0]?.Wochentag} · {dayRows.length} Einträge</SectionHeader>
-          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className={`border-b ${t('border-slate-800 bg-slate-900/40','border-gray-200 bg-gray-50')}`}>
-                  {TABLE_COLS.map(c => (
-                    <th key={c.key} className={`text-left px-4 py-3 text-[9px] font-black uppercase tracking-widest whitespace-nowrap ${t('text-slate-500','text-gray-400')}`}>{c.label}</th>
+                  {TAGES_COLS.map(c => (
+                    <th key={String(c.key)} className={`text-left px-4 py-3 text-[9px] font-black uppercase tracking-widest whitespace-nowrap ${t('text-slate-500','text-gray-400')}`}>{c.label}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {dayRows.map((row,i) => (
-                  <tr key={i} className={`border-b transition-colors ${t('border-slate-800/40 hover:bg-slate-800/30','border-gray-100 hover:bg-gray-50')} ${i%2===0?'':t('bg-slate-800/15','bg-gray-50/60')}`}>
-                    {TABLE_COLS.map(c => (
-                      <td key={c.key} className={`px-4 py-2 font-bold whitespace-nowrap ${c.color || t('text-slate-400','text-gray-500')}`}>
-                        {c.key==='created' ? String(row[c.key]??'').substring(11,16)
-                          : `${fmt(num(row[c.key] as string), c.unit==='€'?2:1)}${c.unit}`}
-                      </td>
-                    ))}
+                {dailyLast.map((row, i) => (
+                  <tr
+                    key={i}
+                    onClick={() => onDayClick(row)}
+                    className={`border-b cursor-pointer transition-colors ${t('border-slate-800/40 hover:bg-slate-800/40','border-gray-100 hover:bg-emerald-50')} ${i % 2 === 0 ? '' : t('bg-slate-800/15','bg-gray-50/60')}`}
+                  >
+                    {TAGES_COLS.map(col => {
+                      let display = '';
+                      if (col.key === 'created') {
+                        display = String(row[col.key] ?? '').substring(11, 16);
+                      } else if (col.key === 'Datum') {
+                        display = String(row[col.key] ?? '').substring(0, 5) + ' ' + (row.Wochentag ?? '');
+                      } else {
+                        const v = num(row[col.key] as string);
+                        display = `${fmt(v, col.unit === '€' ? 2 : 1)}${col.unit}`;
+                      }
+                      return (
+                        <td key={String(col.key)} className={`px-4 py-2 font-bold whitespace-nowrap ${col.color || t('text-slate-400','text-gray-700')}`}>
+                          {display}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className={`px-4 py-2 border-t text-[9px] ${t('border-slate-800 text-slate-600','border-gray-100 text-gray-400')}`}>
+            💡 Klick auf eine Zeile öffnet die Detailansicht · Uhrzeit = letzter Messwert vor Tages-Reset
           </div>
         </Card>
       )}
     </div>
   );
 }
-
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
@@ -827,8 +848,14 @@ export default function Dashboard() {
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then((data: EnergyData[]) => {
         setAllData(data);
-        setLastUpdated(new Date().toLocaleTimeString('de-AT'));
+        // Zeitstempel der zuletzt eingelesenen Zeile aus den Rohdaten
         const latest = data[data.length - 1];
+        if (latest?.created) {
+          const ts = String(latest.created).substring(0, 16).replace('T', ' ');
+          setLastUpdated(ts);
+        } else {
+          setLastUpdated(new Date().toLocaleTimeString('de-AT'));
+        }
         if (latest) { const [,m,y] = latest.Datum.split('.'); setSelectedMonthKey(`${m}.${y}`); }
       })
       .catch(e => setError(e.message))
@@ -1196,7 +1223,7 @@ export default function Dashboard() {
           {activeTab === 'auto'         && <AutoTab    stats={stats} days={days} onDayClick={handleDayClick} />}
           {activeTab === 'temperaturen' && <TemperaturenTab days={days} monthRows={monthRows} onDayClick={handleDayClick} />}
           {activeTab === 'tagesansicht' && (
-            <TagesansichtTab monthRows={monthRows} days={days} selectedDay={selectedDay} setSelectedDay={setSelectedDay} />
+            <TagesansichtTab monthRows={monthRows} days={days} onDayClick={handleDayClick} />
           )}
         </main>
 
