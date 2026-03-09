@@ -4,7 +4,7 @@ import {
   ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, LineChart, Line,
 } from 'recharts';
 
-// âââ Theme System âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Theme System ─────────────────────────────────────────────────────────────
 
 interface ThemeCtxType {
   dark: boolean;
@@ -76,7 +76,7 @@ function buildTheme(dark: boolean, toggle: () => void): ThemeCtxType {
   };
 }
 
-// âââ Types ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface EnergyData {
   created: string; Datum: string; Wochentag: string;
@@ -98,7 +98,7 @@ type TabId = 'uebersicht' | 'energie' | 'auto' | 'temperaturen' | 'tagesansicht'
 
 interface LightboxData { title: string; day: EnergyData; monthAvg: Record<string, number>; }
 
-// âââ Helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const num = (v: string | undefined): number => {
   if (v == null || v === '') return 0;
@@ -106,8 +106,8 @@ const num = (v: string | undefined): number => {
   return isNaN(p) ? 0 : p;
 };
 const fmt  = (v: number, d = 1) => v.toFixed(d);
-const eur  = (v: number) => v.toFixed(2) + ' â¬';
-const MONTHS_DE = ['Januar','Februar','MÃ¤rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const eur  = (v: number) => v.toFixed(2) + ' €';
+const MONTHS_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 
 function getDailyFinal(rows: EnergyData[]): EnergyData[] {
   const map = new Map<string, EnergyData>();
@@ -127,7 +127,7 @@ function getDailyMaxSOC(rows: EnergyData[]): Map<string, number> {
   }
   return map;
 }
-/** Hilfsfunktion: Ist eine Uhrzeit (HH:MM) tagsÃ¼ber? Tag = 07:00â22:00 */
+/** Hilfsfunktion: Ist eine Uhrzeit (HH:MM) tagsüber? Tag = 07:00–22:00 */
 function isTagzeit(created: string): boolean {
   const time = String(created ?? '').substring(11, 16);
   if (!time || time.length < 5) return true;
@@ -135,7 +135,7 @@ function isTagzeit(created: string): boolean {
   const minutes = h * 60 + (min || 0);
   return minutes >= 7 * 60 && minutes < 22 * 60;
 }
-/** Max-AuÃentemperatur pro Tag (Tageszeit 07â22 Uhr) aus allen Stundenwerten */
+/** Max-Außentemperatur pro Tag (Tageszeit 07–22 Uhr) aus allen Stundenwerten */
 function getDailyMaxTempTag(rows: EnergyData[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const row of rows) {
@@ -147,7 +147,7 @@ function getDailyMaxTempTag(rows: EnergyData[]): Map<string, number> {
   }
   return map;
 }
-/** Min-AuÃentemperatur pro Tag (Tageszeit 07â22 Uhr) */
+/** Min-Außentemperatur pro Tag (Tageszeit 07–22 Uhr) */
 function getDailyMinTempTag(rows: EnergyData[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const row of rows) {
@@ -159,7 +159,7 @@ function getDailyMinTempTag(rows: EnergyData[]): Map<string, number> {
   }
   return map;
 }
-/** Max-AuÃentemperatur pro Tag (Nacht: 22â07 Uhr) */
+/** Max-Außentemperatur pro Tag (Nacht: 22–07 Uhr) */
 function getDailyMaxTempNacht(rows: EnergyData[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const row of rows) {
@@ -171,7 +171,7 @@ function getDailyMaxTempNacht(rows: EnergyData[]): Map<string, number> {
   }
   return map;
 }
-/** Min-AuÃentemperatur pro Tag (Nacht: 22â07 Uhr) */
+/** Min-Außentemperatur pro Tag (Nacht: 22–07 Uhr) */
 function getDailyMinTempNacht(rows: EnergyData[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const row of rows) {
@@ -183,7 +183,7 @@ function getDailyMinTempNacht(rows: EnergyData[]): Map<string, number> {
   }
   return map;
 }
-/** Max-AuÃentemperatur pro Tag (alle Stunden) */
+/** Max-Außentemperatur pro Tag (alle Stunden) */
 function getDailyMaxTemp(rows: EnergyData[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const row of rows) {
@@ -194,7 +194,7 @@ function getDailyMaxTemp(rows: EnergyData[]): Map<string, number> {
   }
   return map;
 }
-/** Min-AuÃentemperatur pro Tag (alle Stunden) */
+/** Min-Außentemperatur pro Tag (alle Stunden) */
 function getDailyMinTemp(rows: EnergyData[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const row of rows) {
@@ -222,26 +222,26 @@ function getMonthStats(days: EnergyData[]) {
 }
 
 function generateInsights(stats: ReturnType<typeof getMonthStats>, days: EnergyData[]): string[] {
-  if (!days.length) return ['Noch keine Daten fÃ¼r diesen Monat vorhanden.'];
+  if (!days.length) return ['Noch keine Daten für diesen Monat vorhanden.'];
   const n = days.length; const insights: string[] = [];
-  if (stats.autarky >= 70) insights.push(`âï¸ Ausgezeichnete Autarkie von ${fmt(stats.autarky,0)}% â das Haus versorgt sich fast selbst.`);
-  else if (stats.autarky >= 50) insights.push(`â Gute Autarkie von ${fmt(stats.autarky,0)}% â mehr als die HÃ¤lfte aus eigener Energie.`);
-  else insights.push(`â ï¸ Autarkie bei ${fmt(stats.autarky,0)}% â der Netzbezug dominiert noch.`);
+  if (stats.autarky >= 70) insights.push(`☀️ Ausgezeichnete Autarkie von ${fmt(stats.autarky,0)}% – das Haus versorgt sich fast selbst.`);
+  else if (stats.autarky >= 50) insights.push(`✅ Gute Autarkie von ${fmt(stats.autarky,0)}% – mehr als die Hälfte aus eigener Energie.`);
+  else insights.push(`⚠️ Autarkie bei ${fmt(stats.autarky,0)}% – der Netzbezug dominiert noch.`);
   const bestPV = days.reduce((b,r) => num(r.PV_Ertrag_kWh) > num(b.PV_Ertrag_kWh) ? r : b, days[0]);
-  insights.push(`ð Bester PV-Tag: ${bestPV.Datum} mit ${fmt(num(bestPV.PV_Ertrag_kWh))} kWh â ${bestPV.Wochentag}.`);
-  if (stats.netBalance >= 0) insights.push(`ð° Netto-Bilanz positiv: +${eur(stats.netBalance)} â PV-Einnahmen Ã¼bersteigen Netzkosten.`);
-  else insights.push(`ð Netto-Bilanz: ${eur(stats.netBalance)} â Netzkosten (${eur(stats.totalKosten)}) Ã¼bersteigen PV-Einnahmen.`);
+  insights.push(`🏆 Bester PV-Tag: ${bestPV.Datum} mit ${fmt(num(bestPV.PV_Ertrag_kWh))} kWh – ${bestPV.Wochentag}.`);
+  if (stats.netBalance >= 0) insights.push(`💰 Netto-Bilanz positiv: +${eur(stats.netBalance)} – PV-Einnahmen übersteigen Netzkosten.`);
+  else insights.push(`📉 Netto-Bilanz: ${eur(stats.netBalance)} – Netzkosten (${eur(stats.totalKosten)}) übersteigen PV-Einnahmen.`);
   const avgHeat = stats.totalHeat / n;
-  if (avgHeat > 12) insights.push(`ð¥ Hoher Heizungsverbrauch: â ${fmt(avgHeat)} kWh/Tag â kalte Jahreszeit.`);
-  else if (avgHeat < 2 && avgHeat > 0) insights.push(`ð¿ Niedriger Heizungsverbrauch: â ${fmt(avgHeat)} kWh/Tag.`);
-  if (stats.totalKm > 0) insights.push(`ð E-Auto: ${fmt(stats.totalKm,0)} km gefahren, ${fmt(stats.totalCar)} kWh geladen${stats.totalKm>0 ? `, â ${fmt(stats.totalCar/stats.totalKm*100,1)} kWh/100km` : ''}.`);
+  if (avgHeat > 12) insights.push(`🔥 Hoher Heizungsverbrauch: ∅ ${fmt(avgHeat)} kWh/Tag – kalte Jahreszeit.`);
+  else if (avgHeat < 2 && avgHeat > 0) insights.push(`🌿 Niedriger Heizungsverbrauch: ∅ ${fmt(avgHeat)} kWh/Tag.`);
+  if (stats.totalKm > 0) insights.push(`🚗 E-Auto: ${fmt(stats.totalKm,0)} km gefahren, ${fmt(stats.totalCar)} kWh geladen${stats.totalKm>0 ? `, ∅ ${fmt(stats.totalCar/stats.totalKm*100,1)} kWh/100km` : ''}.`);
   const avgCost = stats.totalKosten / n;
   const highDay = days.find(r => num(r.Kosten_Euro) > avgCost * 2.5);
-  if (highDay) insights.push(`â Kostenspitze am ${highDay.Datum}: ${eur(num(highDay.Kosten_Euro))} (â ${eur(avgCost)}/Tag).`);
+  if (highDay) insights.push(`❗ Kostenspitze am ${highDay.Datum}: ${eur(num(highDay.Kosten_Euro))} (∅ ${eur(avgCost)}/Tag).`);
   return insights.slice(0, 5);
 }
 
-// âââ Small UI Components ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Small UI Components ──────────────────────────────────────────────────────
 
 function StatCard({ label, value, unit, icon, color, sub }: {
   label: string; value: string; unit?: string; icon: string; color: string; sub?: string;
@@ -317,7 +317,7 @@ function TabButton({ id, label, icon, active, onClick }: {
   );
 }
 
-// âââ Lightbox âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
 
 const LIGHTBOX_ROWS: { label: string; key: keyof EnergyData; unit: string; color: string }[] = [
   { label: 'PV Ertrag',      key: 'PV_Ertrag_kWh',            unit: 'kWh', color: 'text-amber-500' },
@@ -325,15 +325,15 @@ const LIGHTBOX_ROWS: { label: string; key: keyof EnergyData; unit: string; color
   { label: 'Einspeisung',    key: 'Netz_Einspeisung_kWh',     unit: 'kWh', color: 'text-sky-500' },
   { label: 'Akku geladen',   key: 'Akku_Geladen_kWh',         unit: 'kWh', color: 'text-violet-500' },
   { label: 'Akku entladen',  key: 'Akku_Entladen_kWh',        unit: 'kWh', color: 'text-violet-400' },
-  { label: 'Stromkosten',    key: 'Kosten_Euro',              unit: 'â¬',   color: 'text-red-500' },
+  { label: 'Stromkosten',    key: 'Kosten_Euro',              unit: '€',   color: 'text-red-500' },
   { label: 'Hausverbrauch',  key: 'Hausverbrauch_Berechnet_kWh', unit: 'kWh', color: 'text-gray-500' },
   { label: 'Heizung',        key: 'Heizung_kWh',              unit: 'kWh', color: 'text-orange-500' },
   { label: 'E-Auto Ladung',  key: 'E_Auto_Ladung_kWh',        unit: 'kWh', color: 'text-blue-500' },
-  { label: 'AuÃentemperatur',key: 'Temp_Aussen',              unit: 'Â°C',  color: 'text-cyan-500' },
-  { label: 'BewÃ¶lkung',      key: 'Bewoelkung_Proz',          unit: '%',   color: 'text-slate-400' },
+  { label: 'Außentemperatur',key: 'Temp_Aussen',              unit: '°C',  color: 'text-cyan-500' },
+  { label: 'Bewölkung',      key: 'Bewoelkung_Proz',          unit: '%',   color: 'text-slate-400' },
   { label: 'PV Prognose',    key: 'PV_Prognose_Heute_kWh',    unit: 'kWh', color: 'text-amber-400' },
   { label: 'Speicher SOC',   key: 'Speicher_Inhalt_SOC_kWh',  unit: 'kWh', color: 'text-purple-500' },
-  { label: 'BÃ¼ro / KÃ¼che',   key: 'Buero_Kueche_kWh',         unit: 'kWh', color: 'text-purple-400' },
+  { label: 'Büro / Küche',   key: 'Buero_Kueche_kWh',         unit: 'kWh', color: 'text-purple-400' },
   { label: 'Gaming-PC',      key: 'Gaming_buero_kWh',         unit: 'kWh', color: 'text-pink-500' },
   { label: 'Waschmaschine',  key: 'Waschmaschine_kWh',        unit: 'kWh', color: 'text-yellow-500' },
 ];
@@ -349,7 +349,7 @@ function Lightbox({ data, onClose }: { data: LightboxData; onClose: () => void }
             <h2 className={`text-lg font-black ${t('text-white','text-gray-900')}`}>{data.title}</h2>
             <p className={`text-[10px] uppercase font-bold tracking-widest ${t('text-slate-400','text-gray-400')}`}>{day.Wochentag}</p>
           </div>
-          <button onClick={onClose} className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold transition-colors ${t('bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700','bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-800')}`}>â</button>
+          <button onClick={onClose} className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold transition-colors ${t('bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700','bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-800')}`}>✕</button>
         </div>
         <div className="space-y-0.5">
           {LIGHTBOX_ROWS.map(({ label, key, unit, color }) => {
@@ -360,7 +360,7 @@ function Lightbox({ data, onClose }: { data: LightboxData; onClose: () => void }
               <div key={key} className={`flex items-center justify-between py-2 border-b ${t('border-slate-800/60','border-gray-100')}`}>
                 <span className={`text-xs ${t('text-slate-400','text-gray-500')}`}>{label}</span>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs font-black ${color}`}>{fmt(val, unit === 'â¬' ? 2 : 1)} {unit}</span>
+                  <span className={`text-xs font-black ${color}`}>{fmt(val, unit === '€' ? 2 : 1)} {unit}</span>
                   {Math.abs(diff) > 15 && avg > 0.01 && (
                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${diff > 0
                       ? t('bg-rose-900/50 text-rose-400','bg-rose-100 text-rose-600')
@@ -373,13 +373,13 @@ function Lightbox({ data, onClose }: { data: LightboxData; onClose: () => void }
             );
           })}
         </div>
-        <p className={`text-[9px] mt-4 text-center ${t('text-slate-600','text-gray-300')}`}>% = Abweichung vom Monatsdurchschnitt Â· ESC oder Klick auÃen schlieÃt</p>
+        <p className={`text-[9px] mt-4 text-center ${t('text-slate-600','text-gray-300')}`}>% = Abweichung vom Monatsdurchschnitt · ESC oder Klick außen schließt</p>
       </div>
     </div>
   );
 }
 
-// âââ Energie Tab ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Energie Tab ──────────────────────────────────────────────────────────────
 
 function EnergieTab({ stats, days, monthRows, onDayClick }: {
   stats: ReturnType<typeof getMonthStats>; days: EnergyData[]; monthRows: EnergyData[]; onDayClick: (d: EnergyData) => void;
@@ -402,11 +402,11 @@ function EnergieTab({ stats, days, monthRows, onDayClick }: {
   const appData = [
     { name: 'Heizung',        value: days.reduce((s,r)=>s+num(r.Heizung_kWh),0),         color: '#f97316' },
     { name: 'E-Auto',         value: days.reduce((s,r)=>s+num(r.E_Auto_Ladung_kWh),0),   color: '#3b82f6' },
-    { name: 'BÃ¼ro/KÃ¼che',     value: days.reduce((s,r)=>s+num(r.Buero_Kueche_kWh),0),    color: '#8b5cf6' },
+    { name: 'Büro/Küche',     value: days.reduce((s,r)=>s+num(r.Buero_Kueche_kWh),0),    color: '#8b5cf6' },
     { name: 'Gaming-PC',      value: days.reduce((s,r)=>s+num(r.Gaming_buero_kWh),0),    color: '#ec4899' },
-    { name: 'KÃ¼hlschrank',    value: days.reduce((s,r)=>s+num(r.Kuehlschrank_kWh),0),    color: '#06b6d4' },
+    { name: 'Kühlschrank',    value: days.reduce((s,r)=>s+num(r.Kuehlschrank_kWh),0),    color: '#06b6d4' },
     { name: 'Gefrierschrank', value: days.reduce((s,r)=>s+num(r.Gefrierschrank_kWh),0),  color: '#14b8a6' },
-    { name: 'GeschirrspÃ¼ler', value: days.reduce((s,r)=>s+num(r.Geschirrspueler_kWh),0), color: '#a3e635' },
+    { name: 'Geschirrspüler', value: days.reduce((s,r)=>s+num(r.Geschirrspueler_kWh),0), color: '#a3e635' },
     { name: 'Waschmaschine',  value: days.reduce((s,r)=>s+num(r.Waschmaschine_kWh),0),   color: '#fbbf24' },
     { name: 'TV / WZ',        value: days.reduce((s,r)=>s+num(r.TV_WZ_kWh),0),           color: '#f43f5e' },
   ].filter(d => d.value > 0).sort((a,b) => b.value - a.value);
@@ -417,19 +417,19 @@ function EnergieTab({ stats, days, monthRows, onDayClick }: {
   return (
     <div className="space-y-6">
       <HighlightStrip items={[
-        { icon:'âï¸', label:'Bester PV-Tag',    value:`${fmt(num(bestPV.PV_Ertrag_kWh))} kWh`,        sub: bestPV.Datum },
-        { icon:'ð', label:'Meist Netzbezug',  value:`${fmt(num(mostGrid.Netzbezug_kWh))} kWh`,      sub: mostGrid.Datum },
-        { icon:'ð¸', label:'GÃ¼nstigster Tag',  value: eur(num(lowestCost.Kosten_Euro)),               sub: lowestCost.Datum },
-        { icon:'â¬ï¸', label:'Meist Eingespeist',value:`${fmt(num(highFeed.Netz_Einspeisung_kWh))} kWh`,sub: highFeed.Datum },
+        { icon:'☀️', label:'Bester PV-Tag',    value:`${fmt(num(bestPV.PV_Ertrag_kWh))} kWh`,        sub: bestPV.Datum },
+        { icon:'🔌', label:'Meist Netzbezug',  value:`${fmt(num(mostGrid.Netzbezug_kWh))} kWh`,      sub: mostGrid.Datum },
+        { icon:'💸', label:'Günstigster Tag',  value: eur(num(lowestCost.Kosten_Euro)),               sub: lowestCost.Datum },
+        { icon:'⬆️', label:'Meist Eingespeist',value:`${fmt(num(highFeed.Netz_Einspeisung_kWh))} kWh`,sub: highFeed.Datum },
       ]} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="PV Ertrag"    value={fmt(stats.totalPV)}       unit="kWh" icon="âï¸" color={cc('amber')}   sub={`â ${fmt(stats.totalPV/stats.daysCount)} kWh/Tag`} />
-        <StatCard label="Netzbezug"    value={fmt(stats.totalGrid)}     unit="kWh" icon="ð" color={cc('rose')}    sub={`â ${fmt(stats.totalGrid/stats.daysCount)} kWh/Tag`} />
-        <StatCard label="Einspeisung"  value={fmt(stats.totalFeed)}     unit="kWh" icon="â¬ï¸" color={cc('sky')}     sub={`${eur(stats.feedRevenue)} ErlÃ¶s`} />
-        <StatCard label="Autarkiegrad" value={fmt(stats.autarky,0)}     unit="%"   icon="ð¡" color={cc(stats.autarky>=50?'emerald':'slate')} sub={`Netto ${stats.netBalance>=0?'+':''}${eur(stats.netBalance)}`} />
+        <StatCard label="PV Ertrag"    value={fmt(stats.totalPV)}       unit="kWh" icon="☀️" color={cc('amber')}   sub={`∅ ${fmt(stats.totalPV/stats.daysCount)} kWh/Tag`} />
+        <StatCard label="Netzbezug"    value={fmt(stats.totalGrid)}     unit="kWh" icon="🔌" color={cc('rose')}    sub={`∅ ${fmt(stats.totalGrid/stats.daysCount)} kWh/Tag`} />
+        <StatCard label="Einspeisung"  value={fmt(stats.totalFeed)}     unit="kWh" icon="⬆️" color={cc('sky')}     sub={`${eur(stats.feedRevenue)} Erlös`} />
+        <StatCard label="Autarkiegrad" value={fmt(stats.autarky,0)}     unit="%"   icon="🏡" color={cc(stats.autarky>=50?'emerald':'slate')} sub={`Netto ${stats.netBalance>=0?'+':''}${eur(stats.netBalance)}`} />
       </div>
       <Card>
-        <SectionHeader>PV Â· Netzbezug Â· Einspeisung â Balken anklicken fÃ¼r Tagesdetails</SectionHeader>
+        <SectionHeader>PV · Netzbezug · Einspeisung — Balken anklicken für Tagesdetails</SectionHeader>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={chartData} barGap={2} onClick={click} style={{cursor:'pointer'}}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
@@ -459,7 +459,7 @@ function EnergieTab({ stats, days, monthRows, onDayClick }: {
           </ResponsiveContainer>
         </Card>
         <Card>
-          <SectionHeader>Tageskosten (â¬)</SectionHeader>
+          <SectionHeader>Tageskosten (€)</SectionHeader>
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={chartData} onClick={click} style={{cursor:'pointer'}}>
               <defs><linearGradient id="kostenGradE" x1="0" y1="0" x2="0" y2="1">
@@ -467,15 +467,15 @@ function EnergieTab({ stats, days, monthRows, onDayClick }: {
               </linearGradient></defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
               <XAxis dataKey="tag" tick={axTick} axisLine={false} tickLine={false} />
-              <YAxis tick={axTick} axisLine={false} tickLine={false} unit=" â¬" width={40} />
-              <Tooltip contentStyle={ts} formatter={(v:number) => [`${fmt(v,2)} â¬`,'Kosten']} />
+              <YAxis tick={axTick} axisLine={false} tickLine={false} unit=" €" width={40} />
+              <Tooltip contentStyle={ts} formatter={(v:number) => [`${fmt(v,2)} €`,'Kosten']} />
               <Area type="monotone" dataKey="Kosten" name="Kosten" stroke="#f43f5e" strokeWidth={2} fill="url(#kostenGradE)" />
             </AreaChart>
           </ResponsiveContainer>
         </Card>
       </div>
       <Card>
-        <SectionHeader>Verbrauch nach GerÃ¤t</SectionHeader>
+        <SectionHeader>Verbrauch nach Gerät</SectionHeader>
         <div className="flex items-center gap-6">
           <div className="flex-shrink-0">
             <ResponsiveContainer width={160} height={160}>
@@ -501,7 +501,7 @@ function EnergieTab({ stats, days, monthRows, onDayClick }: {
   );
 }
 
-// âââ Auto Tab âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Auto Tab ─────────────────────────────────────────────────────────────────
 
 function AutoTab({ stats, days, onDayClick, prevDayKm = 0 }: {
   stats: ReturnType<typeof getMonthStats>; days: EnergyData[]; onDayClick: (d: EnergyData) => void;
@@ -523,19 +523,19 @@ function AutoTab({ stats, days, onDayClick, prevDayKm = 0 }: {
   return (
     <div className="space-y-6">
       <HighlightStrip items={[
-        { icon:'ðï¸', label:'Meiste km an einem Tag', value:`${fmt(mostKmE.km,0)} km`,                 sub:mostKmE.tag },
-        { icon:'â¡',  label:'Meiste Ladung',          value:`${fmt(num(mostCharge.E_Auto_Ladung_kWh))} kWh`, sub:mostCharge.Datum },
-        { icon:'ð', label:'Aktuelle Reichweite',     value:`${latest.Auto_Reichweite_km} km`,         sub:'Jetzt' },
-        { icon:'ð', label:'Kilometerstand',           value:`${parseInt(latest.Auto_Kilometerstand||'0').toLocaleString('de-AT')} km`, sub:'Odometer' },
+        { icon:'🏎️', label:'Meiste km an einem Tag', value:`${fmt(mostKmE.km,0)} km`,                 sub:mostKmE.tag },
+        { icon:'⚡',  label:'Meiste Ladung',          value:`${fmt(num(mostCharge.E_Auto_Ladung_kWh))} kWh`, sub:mostCharge.Datum },
+        { icon:'🔋', label:'Aktuelle Reichweite',     value:`${latest.Auto_Reichweite_km} km`,         sub:'Jetzt' },
+        { icon:'📍', label:'Kilometerstand',           value:`${parseInt(latest.Auto_Kilometerstand||'0').toLocaleString('de-AT')} km`, sub:'Odometer' },
       ]} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Gefahrene km"  value={fmt(stats.totalKm,0)}   unit="km"       icon="ð" color={cc('blue')}   sub={`â ${fmt(stats.totalKm/stats.daysCount,1)} km/Tag`} />
-        <StatCard label="E-Auto Ladung" value={fmt(stats.totalCar)}    unit="kWh"      icon="â¡" color={cc('indigo')} sub={`â ${fmt(stats.totalCar/stats.daysCount)} kWh/Tag`} />
-        <StatCard label="Ã Verbrauch"   value={stats.totalKm>0?fmt(stats.totalCar/stats.totalKm*100,1):'â'} unit="kWh/100km" icon="ð" color={cc('slate')} sub="Effizienz" />
-        <StatCard label="Reichweite"    value={latest.Auto_Reichweite_km||'â'} unit="km" icon="ð" color={cc('teal')}  sub="Aktuell" />
+        <StatCard label="Gefahrene km"  value={fmt(stats.totalKm,0)}   unit="km"       icon="🚗" color={cc('blue')}   sub={`∅ ${fmt(stats.totalKm/stats.daysCount,1)} km/Tag`} />
+        <StatCard label="E-Auto Ladung" value={fmt(stats.totalCar)}    unit="kWh"      icon="⚡" color={cc('indigo')} sub={`∅ ${fmt(stats.totalCar/stats.daysCount)} kWh/Tag`} />
+        <StatCard label="Ø Verbrauch"   value={stats.totalKm>0?fmt(stats.totalCar/stats.totalKm*100,1):'–'} unit="kWh/100km" icon="📊" color={cc('slate')} sub="Effizienz" />
+        <StatCard label="Reichweite"    value={latest.Auto_Reichweite_km||'–'} unit="km" icon="🔋" color={cc('teal')}  sub="Aktuell" />
       </div>
       <Card>
-        <SectionHeader>Tages-km & Ladung â klicken fÃ¼r Details</SectionHeader>
+        <SectionHeader>Tages-km & Ladung — klicken für Details</SectionHeader>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={kmByDay} barGap={4} onClick={click} style={{cursor:'pointer'}}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
@@ -567,7 +567,7 @@ function AutoTab({ stats, days, onDayClick, prevDayKm = 0 }: {
   );
 }
 
-// âââ Temperaturen Tab âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Temperaturen Tab ─────────────────────────────────────────────────────────
 
 function TemperaturenTab({ days, monthRows, onDayClick }: {
   days: EnergyData[];
@@ -587,7 +587,7 @@ function TemperaturenTab({ days, monthRows, onDayClick }: {
 
   const latest = days[days.length-1];
 
-  // WÃ¤rmster / kÃ¤ltester Tag basierend auf dem Tages-Maximum/-Minimum aller Stundenwerte
+  // Wärmster / kältester Tag basierend auf dem Tages-Maximum/-Minimum aller Stundenwerte
   const hottest = days.reduce((b, r) => {
     const maxB = dailyMaxTemp.get(b.Datum) ?? num(b.Temp_Aussen);
     const maxR = dailyMaxTemp.get(r.Datum) ?? num(r.Temp_Aussen);
@@ -599,13 +599,13 @@ function TemperaturenTab({ days, monthRows, onDayClick }: {
     return minR < minB ? r : b;
   }, days[0]);
 
-  // WÃ¤rmster Tag (nur Tagzeit)
+  // Wärmster Tag (nur Tagzeit)
   const hottestTag = days.reduce((b, r) => {
     const maxB = dailyMaxTempTag.get(b.Datum) ?? -999;
     const maxR = dailyMaxTempTag.get(r.Datum) ?? -999;
     return maxR > maxB ? r : b;
   }, days[0]);
-  // KÃ¤lteste Nacht
+  // Kälteste Nacht
   const coldestNacht = days.reduce((b, r) => {
     const minB = dailyMinTempNacht.get(b.Datum) ?? 999;
     const minR = dailyMinTempNacht.get(r.Datum) ?? 999;
@@ -638,16 +638,16 @@ function TemperaturenTab({ days, monthRows, onDayClick }: {
   return (
     <div className="space-y-6">
       <HighlightStrip items={[
-        { icon:'ð¡ï¸', label:'WÃ¤rmster Tag (Tagmax)',  value:`${fmt(hottestVal)}Â°C`,   sub:hottest.Datum },
-        { icon:'ð¥¶', label:'KÃ¤ltester Tag (Tagmin)',  value:`${fmt(coldestVal)}Â°C`,   sub:coldest.Datum },
-        { icon:'âï¸', label:'WÃ¤rmste Tagzeit (07â22)', value:`${fmt(hottestTagVal)}Â°C`, sub:hottestTag.Datum },
-        { icon:'ð', label:'KÃ¤lteste Nacht (22â07)',  value:`${fmt(coldestNachtVal)}Â°C`, sub:coldestNacht.Datum },
+        { icon:'🌡️', label:'Wärmster Tag (Tagmax)',  value:`${fmt(hottestVal)}°C`,   sub:hottest.Datum },
+        { icon:'🥶', label:'Kältester Tag (Tagmin)',  value:`${fmt(coldestVal)}°C`,   sub:coldest.Datum },
+        { icon:'☀️', label:'Wärmste Tagzeit (07–22)', value:`${fmt(hottestTagVal)}°C`, sub:hottestTag.Datum },
+        { icon:'🌙', label:'Kälteste Nacht (22–07)',  value:`${fmt(coldestNachtVal)}°C`, sub:coldestNacht.Datum },
       ]} />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label:'AuÃen aktuell',  val:`${fmt(num(latest.Temp_Aussen))}Â°`,          sub:`âï¸ ${latest.Bewoelkung_Proz}%`,   color:'text-sky-600' },
-          { label:'Wasserbett Papa',val:`${fmt(num(latest.Temp_Wasserbett_Papa))}Â°`,  sub:'Temperatur',                         color:'text-pink-600' },
-          { label:'Wasserbett Mama',val:`${fmt(num(latest.Temp_Wasserbett_Mama))}Â°`,  sub:'Temperatur',                         color:'text-pink-500' },
+          { label:'Außen aktuell',  val:`${fmt(num(latest.Temp_Aussen))}°`,          sub:`☁️ ${latest.Bewoelkung_Proz}%`,   color:'text-sky-600' },
+          { label:'Wasserbett Papa',val:`${fmt(num(latest.Temp_Wasserbett_Papa))}°`,  sub:'Temperatur',                         color:'text-pink-600' },
+          { label:'Wasserbett Mama',val:`${fmt(num(latest.Temp_Wasserbett_Mama))}°`,  sub:'Temperatur',                         color:'text-pink-500' },
           { label:'Luftfeuchte SZ', val:`${latest.Luftfeuchte_Schlafzimmer_Proz}%`, sub:'Schlafzimmer',                        color:'text-teal-600' },
         ].map((b,i) => (
           <div key={i} className={`${t('bg-slate-800/60 border-slate-700/50','bg-white border-gray-200')} border rounded-2xl p-5 text-center`}>
@@ -658,32 +658,32 @@ function TemperaturenTab({ days, monthRows, onDayClick }: {
         ))}
       </div>
       <Card>
-        <SectionHeader>AuÃentemperatur: Tag- und Nacht-Maximum/Minimum</SectionHeader>
-        <div className={`text-[9px] mb-2 ${t('text-slate-500','text-gray-400')}`}>âï¸ Tag 07â22 Uhr Â· ð Nacht 22â07 Uhr</div>
+        <SectionHeader>Außentemperatur: Tag- und Nacht-Maximum/Minimum</SectionHeader>
+        <div className={`text-[9px] mb-2 ${t('text-slate-500','text-gray-400')}`}>☀️ Tag 07–22 Uhr · 🌙 Nacht 22–07 Uhr</div>
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={chartData} onClick={click} style={{cursor:'pointer'}}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
             <XAxis dataKey="tag" tick={axTick} axisLine={false} tickLine={false} />
-            <YAxis tick={axTick} axisLine={false} tickLine={false} unit="Â°" width={35} />
-            <Tooltip contentStyle={ts} formatter={(v: any) => v !== null ? [`${fmt(Number(v))}Â°C`] : ['â']} />
-            <Line type="monotone" dataKey="maxTag"   name="Max Tag âï¸"   stroke="#f59e0b" strokeWidth={2} dot={false} connectNulls />
-            <Line type="monotone" dataKey="minTag"   name="Min Tag âï¸"   stroke="#fbbf24" strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
-            <Line type="monotone" dataKey="maxNacht" name="Max Nacht ð" stroke="#6366f1" strokeWidth={2} dot={false} connectNulls />
-            <Line type="monotone" dataKey="minNacht" name="Min Nacht ð" stroke="#818cf8" strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
+            <YAxis tick={axTick} axisLine={false} tickLine={false} unit="°" width={35} />
+            <Tooltip contentStyle={ts} formatter={(v: any) => v !== null ? [`${fmt(Number(v))}°C`] : ['–']} />
+            <Line type="monotone" dataKey="maxTag"   name="Max Tag ☀️"   stroke="#f59e0b" strokeWidth={2} dot={false} connectNulls />
+            <Line type="monotone" dataKey="minTag"   name="Min Tag ☀️"   stroke="#fbbf24" strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
+            <Line type="monotone" dataKey="maxNacht" name="Max Nacht 🌙" stroke="#6366f1" strokeWidth={2} dot={false} connectNulls />
+            <Line type="monotone" dataKey="minNacht" name="Min Nacht 🌙" stroke="#818cf8" strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
           </LineChart>
         </ResponsiveContainer>
       </Card>
       <Card>
-        <SectionHeader>AuÃentemperatur & BewÃ¶lkung â klicken fÃ¼r Details</SectionHeader>
+        <SectionHeader>Außentemperatur & Bewölkung — klicken für Details</SectionHeader>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData} onClick={click} style={{cursor:'pointer'}}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
             <XAxis dataKey="tag" tick={axTick} axisLine={false} tickLine={false} />
-            <YAxis yAxisId="temp" tick={axTick} axisLine={false} tickLine={false} unit="Â°" width={35} />
+            <YAxis yAxisId="temp" tick={axTick} axisLine={false} tickLine={false} unit="°" width={35} />
             <YAxis yAxisId="cloud" orientation="right" tick={axTick} axisLine={false} tickLine={false} unit="%" width={35} />
             <Tooltip contentStyle={ts} />
-            <Line yAxisId="temp"  type="monotone" dataKey="aussen"     name="AuÃentemp"  stroke="#38bdf8" strokeWidth={2} dot={false} />
-            <Line yAxisId="cloud" type="monotone" dataKey="bewoelkung" name="BewÃ¶lkung"  stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 2" dot={false} />
+            <Line yAxisId="temp"  type="monotone" dataKey="aussen"     name="Außentemp"  stroke="#38bdf8" strokeWidth={2} dot={false} />
+            <Line yAxisId="cloud" type="monotone" dataKey="bewoelkung" name="Bewölkung"  stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 2" dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </Card>
@@ -719,25 +719,25 @@ function TemperaturenTab({ days, monthRows, onDayClick }: {
     </div>
   );
 }
-// âââ Tagesansicht Tab âââââââââââââââââââââââââââââââââââââââââââââââââââ
-// Spalten fÃ¼r die Tagesabschluss-Tabelle
+// ─── Tagesansicht Tab ───────────────────────────────────────────────────
+// Spalten für die Tagesabschluss-Tabelle
 const TAGES_COLS: { label: string; key: keyof EnergyData; unit: string; color: string }[] = [
   { label:'Datum',      key:'Datum',                       unit:'',    color:'' },
   { label:'Uhrzeit',    key:'created',                     unit:'',    color:'' },
   { label:'PV',         key:'PV_Ertrag_kWh',               unit:'kWh', color:'text-amber-600' },
   { label:'Netz',       key:'Netzbezug_kWh',               unit:'kWh', color:'text-rose-600' },
   { label:'Einspeis.',  key:'Netz_Einspeisung_kWh',        unit:'kWh', color:'text-sky-600' },
-  { label:'Kosten',     key:'Kosten_Euro',                 unit:'â¬',   color:'text-red-600' },
+  { label:'Kosten',     key:'Kosten_Euro',                 unit:'€',   color:'text-red-600' },
   { label:'SOC kWh',    key:'Speicher_Inhalt_SOC_kWh',    unit:'kWh', color:'text-violet-600' },
   { label:'Hausverbr.', key:'Hausverbrauch_Berechnet_kWh', unit:'kWh', color:'text-gray-600' },
   { label:'Heizung',    key:'Heizung_kWh',                 unit:'kWh', color:'text-orange-600' },
   { label:'E-Auto',     key:'E_Auto_Ladung_kWh',           unit:'kWh', color:'text-blue-600' },
-  { label:'AuÃen Â°C',   key:'Temp_Aussen',                 unit:'Â°',   color:'text-cyan-600' },
+  { label:'Außen °C',   key:'Temp_Aussen',                 unit:'°',   color:'text-cyan-600' },
   { label:'Prognose',   key:'PV_Prognose_Heute_kWh',       unit:'kWh', color:'text-amber-500' },
-  { label:'Roboter mÂ²', key:'Roboter_Flaeche_m2',          unit:'mÂ²',  color:'text-teal-600' },
+  { label:'Roboter m²', key:'Roboter_Flaeche_m2',          unit:'m²',  color:'text-teal-600' },
 ];
 
-/** Letzten Wert pro Tag vor der ZurÃ¼cksetzung (= hÃ¶chster created-Timestamp des Tages) */
+/** Letzten Wert pro Tag vor der Zurücksetzung (= höchster created-Timestamp des Tages) */
 function getDailyLastEntry(rows: EnergyData[]): EnergyData[] {
   const map = new Map<string, EnergyData>();
   for (const row of rows) {
@@ -771,10 +771,10 @@ function TagesansichtTab({ monthRows, days, onDayClick, heuteFilter = false }: {
     return (
       <div className="space-y-4">
         <div className={`text-[10px] font-bold uppercase tracking-widest ${t('text-slate-500','text-gray-400')}`}>
-          Stundenwerte Â· Heute Â· {todayLabel} {wochentag} Â· {hourRows.length} EintrÃ¤ge
+          Stundenwerte · Heute · {todayLabel} {wochentag} · {hourRows.length} Einträge
         </div>
         {hourRows.length === 0 ? (
-          <Card><p className={`text-center py-8 ${t('text-slate-500','text-gray-400')}`}>Keine Daten fÃ¼r heute.</p></Card>
+          <Card><p className={`text-center py-8 ${t('text-slate-500','text-gray-400')}`}>Keine Daten für heute.</p></Card>
         ) : (
           <Card className="!p-0 overflow-hidden">
             <div className="overflow-x-auto">
@@ -801,7 +801,7 @@ function TagesansichtTab({ monthRows, days, onDayClick, heuteFilter = false }: {
                           display = String(row[col.key] ?? '').substring(0, 5) + ' ' + (row.Wochentag ?? '');
                         } else {
                           const v = num(row[col.key] as string);
-                          display = `${fmt(v, col.unit === 'â¬' ? 2 : 1)}${col.unit}`;
+                          display = `${fmt(v, col.unit === '€' ? 2 : 1)}${col.unit}`;
                         }
                         return (
                           <td key={String(col.key)} className={`px-4 py-2 font-bold whitespace-nowrap ${col.color || t('text-slate-400','text-gray-700')}`}>
@@ -815,7 +815,7 @@ function TagesansichtTab({ monthRows, days, onDayClick, heuteFilter = false }: {
               </table>
             </div>
             <div className={`px-4 py-2 border-t text-[9px] ${t('border-slate-800 text-slate-600','border-gray-100 text-gray-400')}`}>
-              ð¡ Klick auf eine Zeile Ã¶ffnet die Detailansicht Â· Stundenwerte des heutigen Tages
+              💡 Klick auf eine Zeile öffnet die Detailansicht · Stundenwerte des heutigen Tages
             </div>
           </Card>
         )}
@@ -826,7 +826,7 @@ function TagesansichtTab({ monthRows, days, onDayClick, heuteFilter = false }: {
   return (
     <div className="space-y-4">
       <div className={`text-[10px] font-bold uppercase tracking-widest ${t('text-slate-500','text-gray-400')}`}>
-        Tagesabschluss-Werte Â· {dailyLast.length} Tage Â· letzter erfasster Eintrag pro Tag vor ZurÃ¼cksetzung
+        Tagesabschluss-Werte · {dailyLast.length} Tage · letzter erfasster Eintrag pro Tag vor Zurücksetzung
       </div>
       {dailyLast.length === 0 ? (
         <Card><p className={`text-center py-8 ${t('text-slate-500','text-gray-400')}`}>Keine Daten.</p></Card>
@@ -856,7 +856,7 @@ function TagesansichtTab({ monthRows, days, onDayClick, heuteFilter = false }: {
                         display = String(row[col.key] ?? '').substring(0, 5) + ' ' + (row.Wochentag ?? '');
                       } else {
                         const v = num(row[col.key] as string);
-                        display = `${fmt(v, col.unit === 'â¬' ? 2 : 1)}${col.unit}`;
+                        display = `${fmt(v, col.unit === '€' ? 2 : 1)}${col.unit}`;
                       }
                       return (
                         <td key={String(col.key)} className={`px-4 py-2 font-bold whitespace-nowrap ${col.color || t('text-slate-400','text-gray-700')}`}>
@@ -870,7 +870,7 @@ function TagesansichtTab({ monthRows, days, onDayClick, heuteFilter = false }: {
             </table>
           </div>
           <div className={`px-4 py-2 border-t text-[9px] ${t('border-slate-800 text-slate-600','border-gray-100 text-gray-400')}`}>
-            ð¡ Klick auf eine Zeile Ã¶ffnet die Detailansicht Â· Uhrzeit = letzter Messwert vor Tages-Reset
+            💡 Klick auf eine Zeile öffnet die Detailansicht · Uhrzeit = letzter Messwert vor Tages-Reset
           </div>
         </Card>
       )}
@@ -878,14 +878,14 @@ function TagesansichtTab({ monthRows, days, onDayClick, heuteFilter = false }: {
   );
 }
 
-// âââ Main Dashboard âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id:'uebersicht',   label:'Ãbersicht',   icon:'ð¡' },
-  { id:'energie',      label:'Energie',      icon:'â¡' },
-  { id:'auto',         label:'Auto',         icon:'ð' },
-  { id:'temperaturen', label:'Temperaturen', icon:'ð¡ï¸' },
-  { id:'tagesansicht', label:'Tagesansicht', icon:'ð' },
+  { id:'uebersicht',   label:'Übersicht',   icon:'🏡' },
+  { id:'energie',      label:'Energie',      icon:'⚡' },
+  { id:'auto',         label:'Auto',         icon:'🚗' },
+  { id:'temperaturen', label:'Temperaturen', icon:'🌡️' },
+  { id:'tagesansicht', label:'Tagesansicht', icon:'📋' },
 ];
 
 export default function Dashboard() {
@@ -950,7 +950,7 @@ export default function Dashboard() {
     return { monthRows, days, stats: getMonthStats(days), monthLabel: `${MONTHS_DE[parseInt(m)-1]} ${y}`, dailyMaxSOC };
   }, [allData, selectedMonthKey]);
 
-  // ââ Heute-Filter ââ
+  // ── Heute-Filter ──
   const todayDatum = useMemo(() => allData.length ? allData[allData.length - 1].Datum : '', [allData]);
   const heuteRows  = useMemo(() => todayDatum ? allData.filter(r => r.Datum === todayDatum).sort((a,b) => a.created < b.created ? -1 : 1) : [], [allData, todayDatum]);
   const heuteDays  = useMemo(() => getDailyFinal(heuteRows), [heuteRows]);
@@ -958,11 +958,10 @@ export default function Dashboard() {
   const heuteMaxSOC= useMemo(() => getDailyMaxSOC(heuteRows), [heuteRows]);
   const prevDayKm = useMemo(() => {
     if (!heuteFilter || !heuteRows.length) return 0;
-    const firstHeuteCreated = heuteRows[0].created;
-    const prevRows = allData.filter(r => r.created < firstHeuteCreated && r.Datum !== todayDatum);
+    const firstCreated = heuteRows[0].created;
+    const prevRows = allData.filter(r => r.created < firstCreated && r.Datum !== todayDatum);
     return prevRows.length ? num(prevRows[prevRows.length - 1].Auto_Kilometerstand) : 0;
   }, [heuteFilter, heuteRows, allData, todayDatum]);
-
   const activeMonthRows  = heuteFilter ? heuteRows   : monthRows;
   const activeDays       = heuteFilter ? heuteDays   : days;
   const activeStats      = heuteFilter ? (heuteStats ?? stats) : stats;
@@ -999,14 +998,14 @@ export default function Dashboard() {
     <div className={`min-h-screen flex items-center justify-center ${isDark?'bg-slate-950':'bg-gray-50'}`}>
       <div className="flex flex-col items-center gap-4">
         <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-        <p className={`font-mono text-xs uppercase tracking-widest ${isDark?'text-emerald-400':'text-emerald-600'}`}>Lade Energiedatenâ¦</p>
+        <p className={`font-mono text-xs uppercase tracking-widest ${isDark?'text-emerald-400':'text-emerald-600'}`}>Lade Energiedaten…</p>
       </div>
     </div>
   );
 
   if (error) return (
     <div className={`min-h-screen flex items-center justify-center ${isDark?'bg-slate-950':'bg-gray-50'}`}>
-      <div className="text-red-500 text-center"><div className="text-4xl mb-4">â¡</div>
+      <div className="text-red-500 text-center"><div className="text-4xl mb-4">⚡</div>
         <p className="font-bold">Fehler beim Laden der Daten</p>
         <p className="text-sm opacity-60 mt-1">{error}</p></div>
     </div>
@@ -1039,15 +1038,15 @@ export default function Dashboard() {
     <ThemeCtx.Provider value={theme}>
       <div className={`min-h-screen font-sans transition-colors duration-200 ${isDark ? 'dark bg-slate-950 text-slate-100' : 'bg-gray-50 text-gray-900'}`}>
 
-        {/* ââ Header ââ */}
+        {/* ── Header ── */}
         <header className={`sticky top-0 z-30 backdrop-blur border-b ${t('bg-slate-950/90 border-slate-800','bg-white/95 border-gray-200')}`}>
           <div className="max-w-7xl mx-auto px-4 h-auto py-3 flex flex-wrap items-center justify-between gap-3">
             {/* Logo */}
             <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center text-lg shadow-lg shadow-emerald-500/20">â¡</div>
+              <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center text-lg shadow-lg shadow-emerald-500/20">⚡</div>
               <div>
                 <h1 className={`text-sm font-black tracking-tight leading-none ${t('text-white','text-gray-900')}`}>Energie Dashboard</h1>
-                <p className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${t('text-emerald-400','text-emerald-600')}`}>Smart Home Â· Tirol</p>
+                <p className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${t('text-emerald-400','text-emerald-600')}`}>Smart Home · Tirol</p>
               </div>
             </div>
 
@@ -1056,7 +1055,7 @@ export default function Dashboard() {
               {/* Live indicator */}
               <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${t('bg-slate-800','bg-gray-100')}`}>
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                <span className={`text-[10px] font-bold uppercase ${t('text-slate-400','text-gray-500')}`}>Live Â· {lastUpdated}</span>
+                <span className={`text-[10px] font-bold uppercase ${t('text-slate-400','text-gray-500')}`}>Live · {lastUpdated}</span>
               </div>
 
               {/* Heute-Filter */}
@@ -1069,7 +1068,7 @@ export default function Dashboard() {
             }`}
             title="Nur Daten von heute anzeigen"
           >
-            <span>ð</span><span>Heute</span>
+            <span>📅</span><span>Heute</span>
           </button>
           {/* Month filter */}
               <select value={selectedMonthKey} onChange={e => setSelectedMonthKey(e.target.value)}
@@ -1083,7 +1082,7 @@ export default function Dashboard() {
               {/* Day filter */}
               <select value={selectedDay} onChange={e => handleDayFilter(e.target.value)}
                 className={`${selStyle} text-[11px] font-bold rounded-lg px-3 py-1.5 outline-none cursor-pointer`}>
-                <option value="">â Alle Tage â</option>
+                <option value="">— Alle Tage —</option>
                 {days.map(d => (
                   <option key={d.Datum} value={d.Datum}>{d.Datum.substring(0,5)} {d.Wochentag}</option>
                 ))}
@@ -1096,13 +1095,13 @@ export default function Dashboard() {
                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
                 title={isDark ? 'Light Mode' : 'Dark Mode'}>
-                {isDark ? 'âï¸' : 'ð'}
+                {isDark ? '☀️' : '🌙'}
               </button>
             </div>
           </div>
         </header>
 
-        {/* ââ Tab Bar ââ */}
+        {/* ── Tab Bar ── */}
         <div className={`sticky top-[68px] z-20 backdrop-blur border-b ${t('bg-slate-950/90 border-slate-800','bg-white/95 border-gray-200')}`}>
           <div className="max-w-7xl mx-auto px-4 py-2.5 flex gap-2 overflow-x-auto no-scrollbar">
             {TABS.map(tab => (
@@ -1113,31 +1112,31 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ââ Main ââ */}
+        {/* ── Main ── */}
         <main className="max-w-7xl mx-auto px-4 py-8">
 
-          {/* ÃBERSICHT */}
+          {/* ÜBERSICHT */}
           {activeTab === 'uebersicht' && (
             <div className="space-y-8">
               <section>
                 <h2 className={`text-[10px] font-black uppercase tracking-widest mb-4 ${t('text-slate-500','text-gray-400')}`}>
-                  MonatsÃ¼bersicht Â· {activeLabel} Â· {activeStats.daysCount} Tage erfasst
+                  Monatsübersicht · {activeLabel} · {activeStats.daysCount} Tage erfasst
                 </h2>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <StatCard label="Stromkosten"  value={fmt(activeStats.totalKosten,2)} unit="â¬"   icon="ð§¾" color={cc('rose')}    sub={`â ${fmt(activeStats.totalKosten/activeStats.daysCount,2)} â¬/Tag`} />
-                  <StatCard label="PV Ertrag"    value={fmt(activeStats.totalPV)}       unit="kWh"  icon="âï¸" color={cc('amber')}   sub={`â ${fmt(activeStats.totalPV/activeStats.daysCount)} kWh/Tag`} />
-                  <StatCard label="Autarkiegrad" value={fmt(activeStats.autarky,0)}     unit="%"    icon="ð¡" color={cc(activeStats.autarky>=50?'emerald':'slate')} sub={`Netzbezug ${fmt(activeStats.totalGrid)} kWh`} />
-                  <StatCard label="PV-Ersparnis" value={fmt(activeStats.pvSavings,2)}   unit="â¬"    icon="ð°" color={cc('green')}   sub={`+ ${fmt(activeStats.feedRevenue,2)} â¬ Einspeisung`} />
+                  <StatCard label="Stromkosten"  value={fmt(activeStats.totalKosten,2)} unit="€"   icon="🧾" color={cc('rose')}    sub={`∅ ${fmt(activeStats.totalKosten/activeStats.daysCount,2)} €/Tag`} />
+                  <StatCard label="PV Ertrag"    value={fmt(activeStats.totalPV)}       unit="kWh"  icon="☀️" color={cc('amber')}   sub={`∅ ${fmt(activeStats.totalPV/activeStats.daysCount)} kWh/Tag`} />
+                  <StatCard label="Autarkiegrad" value={fmt(activeStats.autarky,0)}     unit="%"    icon="🏡" color={cc(activeStats.autarky>=50?'emerald':'slate')} sub={`Netzbezug ${fmt(activeStats.totalGrid)} kWh`} />
+                  <StatCard label="PV-Ersparnis" value={fmt(activeStats.pvSavings,2)}   unit="€"    icon="💰" color={cc('green')}   sub={`+ ${fmt(activeStats.feedRevenue,2)} € Einspeisung`} />
                 </div>
               </section>
 
-              {/* ââ Monats-Highlights ââ */}
+              {/* ── Monats-Highlights ── */}
               {(() => {
                 // Bester PV-Tag
                 const bestPV = activeDays.reduce((b,r) => num(r.PV_Ertrag_kWh)>num(b.PV_Ertrag_kWh)?r:b, activeDays[0]);
-                // GÃ¼nstigster Tag
+                // Günstigster Tag
                 const cheapDay = activeDays.reduce((b,r) => num(r.Kosten_Euro)<num(b.Kosten_Euro)?r:b, activeDays[0]);
-                // HÃ¶chster Akku-Stand (Tagesmax)
+                // Höchster Akku-Stand (Tagesmax)
                 const maxSOCEntry = activeDays.reduce((b,r) => {
                   const soc = activeDailyMaxSOC.get(r.Datum)??0;
                   return soc > (activeDailyMaxSOC.get(b.Datum)??0) ? r : b;
@@ -1150,7 +1149,7 @@ export default function Dashboard() {
                   return a>0 ? (s/a)*100 : 0;
                 };
                 const bestAutarky = activeDays.reduce((b,r) => autarkyDay(r)>autarkyDay(b)?r:b, activeDays[0]);
-                // WÃ¤rmster Tag
+                // Wärmster Tag
                 const _ovMaxTemp = getDailyMaxTemp(activeMonthRows);
         const hottestDay = activeDays.reduce((b, r) => {
           const mxB = _ovMaxTemp.get(b.Datum) ?? num(b.Temp_Aussen);
@@ -1160,7 +1159,7 @@ export default function Dashboard() {
         const _hottestDayVal = _ovMaxTemp.get(hottestDay?.Datum ?? '') ?? num(hottestDay?.Temp_Aussen ?? '');
                 // Meiste Einspeisung
                 const bestFeed = activeDays.reduce((b,r) => num(r.Netz_Einspeisung_kWh)>num(b.Netz_Einspeisung_kWh)?r:b, activeDays[0]);
-                // Roboter GesamtflÃ¤che
+                // Roboter Gesamtfläche
                 const totalRobot = activeDays.reduce((s,r) => s+num(r.Roboter_Flaeche_m2), 0);
                 // Meiste km Tag
                 const kmByDay = activeDays.map((r,i) => ({
@@ -1169,21 +1168,21 @@ export default function Dashboard() {
                 const mostKmDay = kmByDay.reduce((b,r) => r.km>b.km?r:b, kmByDay[0]??{datum:'',km:0});
 
                 const row1 = [
-                  { icon:'âï¸', label:'Bester PV-Tag',     value:`${fmt(num(bestPV?.PV_Ertrag_kWh))} kWh`,  sub: bestPV?.Datum },
-                  { icon:'ð', label:'Akku-Maximum',       value:`${fmt(maxSOCVal)} kWh`,                    sub: maxSOCEntry?.Datum },
-                  { icon:'ð¡', label:'Bester Autarkie-Tag',value:`${fmt(autarkyDay(bestAutarky),0)}%`,        sub: bestAutarky?.Datum },
-                  { icon:'ð¸', label:'GÃ¼nstigster Tag',    value: eur(num(cheapDay?.Kosten_Euro)),            sub: cheapDay?.Datum },
+                  { icon:'☀️', label:'Bester PV-Tag',     value:`${fmt(num(bestPV?.PV_Ertrag_kWh))} kWh`,  sub: bestPV?.Datum },
+                  { icon:'🔋', label:'Akku-Maximum',       value:`${fmt(maxSOCVal)} kWh`,                    sub: maxSOCEntry?.Datum },
+                  { icon:'🏡', label:'Bester Autarkie-Tag',value:`${fmt(autarkyDay(bestAutarky),0)}%`,        sub: bestAutarky?.Datum },
+                  { icon:'💸', label:'Günstigster Tag',    value: eur(num(cheapDay?.Kosten_Euro)),            sub: cheapDay?.Datum },
                 ];
                 const row2 = [
-                  { icon:'ð¡ï¸', label:'WÃ¤rmster Tag',       value:`${fmt(_hottestDayVal)}Â°C`,   sub: hottestDay?.Datum },
-                  { icon:'â¬ï¸', label:'Meist Eingespeist',  value:`${fmt(num(bestFeed?.Netz_Einspeisung_kWh))} kWh`, sub: bestFeed?.Datum },
-                  { icon:'ð§¹', label:'Roboter Monat',      value:`${fmt(totalRobot,0)} mÂ²`,                  sub:'GesamtflÃ¤che' },
-                  { icon:'ð', label:'Meiste km/Tag',      value:`${fmt(mostKmDay.km,0)} km`,                sub: mostKmDay.datum?.substring(0,5) || 'â' },
+                  { icon:'🌡️', label:'Wärmster Tag',       value:`${fmt(_hottestDayVal)}°C`,   sub: hottestDay?.Datum },
+                  { icon:'⬆️', label:'Meist Eingespeist',  value:`${fmt(num(bestFeed?.Netz_Einspeisung_kWh))} kWh`, sub: bestFeed?.Datum },
+                  { icon:'🧹', label:'Roboter Monat',      value:`${fmt(totalRobot,0)} m²`,                  sub:'Gesamtfläche' },
+                  { icon:'🚗', label:'Meiste km/Tag',      value:`${fmt(mostKmDay.km,0)} km`,                sub: mostKmDay.datum?.substring(0,5) || '–' },
                 ];
                 return (
                   <section className="space-y-3">
                     <h2 className={`text-[10px] font-black uppercase tracking-widest ${t('text-slate-500','text-gray-400')}`}>
-                      â¨ Monats-Highlights Â· {activeLabel}
+                      ✨ Monats-Highlights · {activeLabel}
                     </h2>
                     <HighlightStrip items={row1} />
                     <HighlightStrip items={row2} />
@@ -1193,7 +1192,7 @@ export default function Dashboard() {
 
               {/* KI-Analyse */}
               <section>
-                <h2 className={`text-[10px] font-black uppercase tracking-widest mb-4 ${t('text-slate-500','text-gray-400')}`}>ð¤ KI-Monatsanalyse Â· {activeLabel}</h2>
+                <h2 className={`text-[10px] font-black uppercase tracking-widest mb-4 ${t('text-slate-500','text-gray-400')}`}>🤖 KI-Monatsanalyse · {activeLabel}</h2>
                 <div className={`${t('bg-slate-900/60 border-emerald-900/40','bg-emerald-50 border-emerald-200')} border rounded-2xl p-5 space-y-3`}>
                   {insights.map((ins, i) => (
                     <div key={i} className="flex gap-3 items-start">
@@ -1211,7 +1210,7 @@ export default function Dashboard() {
                   ? t('bg-emerald-950/40 border-emerald-700/30','bg-emerald-50 border-emerald-200')
                   : t('bg-slate-800/60 border-slate-700/50','bg-white border-gray-200')}`}>
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg">â¡</span>
+                    <span className="text-lg">⚡</span>
                     <span className={`text-[11px] font-black uppercase tracking-widest opacity-60`}>Energie-Bilanz</span>
                   </div>
                   <div className={`divide-y ${t('divide-white/5','divide-gray-100')}`}>
@@ -1232,7 +1231,7 @@ export default function Dashboard() {
                 {/* Aktueller Stand */}
                 <div className={`rounded-2xl p-5 border ${t('bg-slate-800/60 border-slate-700/50','bg-white border-gray-200')}`}>
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg">ð¡</span>
+                    <span className="text-lg">📡</span>
                     <span className="text-[11px] font-black uppercase tracking-widest opacity-60">Aktueller Stand</span>
                   </div>
                   <div className="space-y-3 mb-4">
@@ -1250,12 +1249,12 @@ export default function Dashboard() {
                     <div className="text-center pt-1">
                       <div className={`text-[10px] uppercase font-bold ${t('text-slate-500','text-gray-400')}`}>Speicher-Inhalt</div>
                       <div className="text-2xl font-black text-violet-600">{fmt(accuContent)} <span className="text-sm">kWh</span></div>
-                      <div className={`text-[9px] mt-0.5 ${t('text-slate-500','text-gray-400')}`}>nutzbar: {fmt(Math.max(0, accuContent-1.23))} kWh Â· max 10,24 kWh</div>
+                      <div className={`text-[9px] mt-0.5 ${t('text-slate-500','text-gray-400')}`}>nutzbar: {fmt(Math.max(0, accuContent-1.23))} kWh · max 10,24 kWh</div>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { label:'AuÃen', val:`${fmt(num(latest.Temp_Aussen))}Â°`, sub:`âï¸ ${latest.Bewoelkung_Proz}%`, color:'text-sky-600' },
+                      { label:'Außen', val:`${fmt(num(latest.Temp_Aussen))}°`, sub:`☁️ ${latest.Bewoelkung_Proz}%`, color:'text-sky-600' },
                       { label:'PV Prognose', val:`${fmt(num(latest.PV_Prognose_Heute_kWh))} kWh`, sub:'heute', color:'text-amber-600' },
                     ].map(b => (
                       <div key={b.label} className={`${t('bg-slate-700/40','bg-gray-100')} rounded-xl p-3 text-center`}>
@@ -1270,7 +1269,7 @@ export default function Dashboard() {
                 {/* E-Auto */}
                 <div className={`rounded-2xl p-5 border ${t('bg-slate-800/60 border-slate-700/50','bg-white border-gray-200')}`}>
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg">ð</span>
+                    <span className="text-lg">🚗</span>
                     <span className="text-[11px] font-black uppercase tracking-widest opacity-60">Renault 4 E-Tech</span>
                   </div>
                   <div className="flex justify-between items-center mb-3">
@@ -1288,7 +1287,7 @@ export default function Dashboard() {
               {/* Overview Charts */}
               <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
-                  <SectionHeader>PV Ertrag vs. Netzbezug â klicken fÃ¼r Details</SectionHeader>
+                  <SectionHeader>PV Ertrag vs. Netzbezug — klicken für Details</SectionHeader>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={overviewData} barGap={2} onClick={ovClick} style={{cursor:'pointer'}}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
@@ -1301,7 +1300,7 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                 </Card>
                 <Card>
-                  <SectionHeader>Speicher-Inhalt (kWh) â klicken fÃ¼r Details</SectionHeader>
+                  <SectionHeader>Speicher-Inhalt (kWh) — klicken für Details</SectionHeader>
                   <ResponsiveContainer width="100%" height={220}>
                     <AreaChart data={overviewData} onClick={ovClick} style={{cursor:'pointer'}}>
                       <defs><linearGradient id="akkuGradO" x1="0" y1="0" x2="0" y2="1">
@@ -1329,7 +1328,7 @@ export default function Dashboard() {
 
         <footer className="max-w-7xl mx-auto px-4 py-6 text-center">
           <p className={`text-[9px] font-bold uppercase tracking-widest ${t('text-slate-600','text-gray-300')}`}>
-            Haus Tirol Â· Smart Home Energy Dashboard Â· Daten via HomeAssistant
+            Haus Tirol · Smart Home Energy Dashboard · Daten via HomeAssistant
           </p>
         </footer>
 
