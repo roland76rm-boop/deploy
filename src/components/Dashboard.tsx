@@ -127,6 +127,84 @@ function getDailyMaxSOC(rows: EnergyData[]): Map<string, number> {
   }
   return map;
 }
+/** Hilfsfunktion: Ist eine Uhrzeit (HH:MM) tagsüber? Tag = 07:00–22:00 */
+function isTagzeit(created: string): boolean {
+  const time = String(created ?? '').substring(11, 16);
+  if (!time || time.length < 5) return true;
+  const [h, min] = time.split(':').map(Number);
+  const minutes = h * 60 + (min || 0);
+  return minutes >= 7 * 60 && minutes < 22 * 60;
+}
+/** Max-Außentemperatur pro Tag (Tageszeit 07–22 Uhr) aus allen Stundenwerten */
+function getDailyMaxTempTag(rows: EnergyData[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    if (!isTagzeit(row.created)) continue;
+    const t = num(row.Temp_Aussen);
+    if (t === 0 && row.Temp_Aussen === '') continue;
+    const cur = map.get(row.Datum);
+    if (cur === undefined || t > cur) map.set(row.Datum, t);
+  }
+  return map;
+}
+/** Min-Außentemperatur pro Tag (Tageszeit 07–22 Uhr) */
+function getDailyMinTempTag(rows: EnergyData[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    if (!isTagzeit(row.created)) continue;
+    const t = num(row.Temp_Aussen);
+    if (t === 0 && row.Temp_Aussen === '') continue;
+    const cur = map.get(row.Datum);
+    if (cur === undefined || t < cur) map.set(row.Datum, t);
+  }
+  return map;
+}
+/** Max-Außentemperatur pro Tag (Nacht: 22–07 Uhr) */
+function getDailyMaxTempNacht(rows: EnergyData[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    if (isTagzeit(row.created)) continue;
+    const t = num(row.Temp_Aussen);
+    if (t === 0 && row.Temp_Aussen === '') continue;
+    const cur = map.get(row.Datum);
+    if (cur === undefined || t > cur) map.set(row.Datum, t);
+  }
+  return map;
+}
+/** Min-Außentemperatur pro Tag (Nacht: 22–07 Uhr) */
+function getDailyMinTempNacht(rows: EnergyData[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    if (isTagzeit(row.created)) continue;
+    const t = num(row.Temp_Aussen);
+    if (t === 0 && row.Temp_Aussen === '') continue;
+    const cur = map.get(row.Datum);
+    if (cur === undefined || t < cur) map.set(row.Datum, t);
+  }
+  return map;
+}
+/** Max-Außentemperatur pro Tag (alle Stunden) */
+function getDailyMaxTemp(rows: EnergyData[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    const t = num(row.Temp_Aussen);
+    if (t === 0 && row.Temp_Aussen === '') continue;
+    const cur = map.get(row.Datum);
+    if (cur === undefined || t > cur) map.set(row.Datum, t);
+  }
+  return map;
+}
+/** Min-Außentemperatur pro Tag (alle Stunden) */
+function getDailyMinTemp(rows: EnergyData[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    const t = num(row.Temp_Aussen);
+    if (t === 0 && row.Temp_Aussen === '') continue;
+    const cur = map.get(row.Datum);
+    if (cur === undefined || t < cur) map.set(row.Datum, t);
+  }
+  return map;
+}
 
 function getMonthStats(days: EnergyData[]) {
   const n = Math.max(days.length, 1);
@@ -490,34 +568,86 @@ function AutoTab({ stats, days, onDayClick }: {
 
 // ─── Temperaturen Tab ─────────────────────────────────────────────────────────
 
-function TemperaturenTab({ days, onDayClick }: { days: EnergyData[]; onDayClick: (d: EnergyData) => void; }) {
+function TemperaturenTab({ days, monthRows, onDayClick }: {
+  days: EnergyData[];
+  monthRows: EnergyData[];
+  onDayClick: (d: EnergyData) => void;
+}) {
   const { t, ts, gc, ac } = useTheme();
   if (!days.length) return <Card><p className={`text-center py-8 ${t('text-slate-500','text-gray-400')}`}>Keine Daten.</p></Card>;
 
-  const latest  = days[days.length-1];
-  const hottest = days.reduce((b,r) => num(r.Temp_Aussen)>num(b.Temp_Aussen)?r:b, days[0]);
-  const coldest = days.reduce((b,r) => num(r.Temp_Aussen)<num(b.Temp_Aussen)?r:b, days[0]);
+  // Tageszeit-Maps aus allen Stundenwerten (monthRows)
+  const dailyMaxTemp    = useMemo(() => getDailyMaxTemp(monthRows),     [monthRows]);
+  const dailyMinTemp    = useMemo(() => getDailyMinTemp(monthRows),     [monthRows]);
+  const dailyMaxTempTag = useMemo(() => getDailyMaxTempTag(monthRows),  [monthRows]);
+  const dailyMinTempTag = useMemo(() => getDailyMinTempTag(monthRows),  [monthRows]);
+  const dailyMaxTempNacht = useMemo(() => getDailyMaxTempNacht(monthRows), [monthRows]);
+  const dailyMinTempNacht = useMemo(() => getDailyMinTempNacht(monthRows), [monthRows]);
+
+  const latest = days[days.length-1];
+
+  // Wärmster / kältester Tag basierend auf dem Tages-Maximum/-Minimum aller Stundenwerte
+  const hottest = days.reduce((b, r) => {
+    const maxB = dailyMaxTemp.get(b.Datum) ?? num(b.Temp_Aussen);
+    const maxR = dailyMaxTemp.get(r.Datum) ?? num(r.Temp_Aussen);
+    return maxR > maxB ? r : b;
+  }, days[0]);
+  const coldest = days.reduce((b, r) => {
+    const minB = dailyMinTemp.get(b.Datum) ?? num(b.Temp_Aussen);
+    const minR = dailyMinTemp.get(r.Datum) ?? num(r.Temp_Aussen);
+    return minR < minB ? r : b;
+  }, days[0]);
+
+  // Wärmster Tag (nur Tagzeit)
+  const hottestTag = days.reduce((b, r) => {
+    const maxB = dailyMaxTempTag.get(b.Datum) ?? -999;
+    const maxR = dailyMaxTempTag.get(r.Datum) ?? -999;
+    return maxR > maxB ? r : b;
+  }, days[0]);
+  // Kälteste Nacht
+  const coldestNacht = days.reduce((b, r) => {
+    const minB = dailyMinTempNacht.get(b.Datum) ?? 999;
+    const minR = dailyMinTempNacht.get(r.Datum) ?? 999;
+    return minR < minB ? r : b;
+  }, days[0]);
+
   const mostHeat= days.reduce((b,r) => num(r.Heizung_kWh)>num(b.Heizung_kWh)?r:b, days[0]);
   const avgHumid= days.reduce((s,r) => s+num(r.Luftfeuchte_Schlafzimmer_Proz),0)/days.length;
-  const chartData = days.map(r => ({ tag:r.Datum.substring(0,5), aussen:num(r.Temp_Aussen),
-    bewoelkung:num(r.Bewoelkung_Proz), heizung:num(r.Heizung_kWh), feucht:num(r.Luftfeuchte_Schlafzimmer_Proz), _row:r }));
+
+  const hottestVal   = dailyMaxTemp.get(hottest.Datum)     ?? num(hottest.Temp_Aussen);
+  const coldestVal   = dailyMinTemp.get(coldest.Datum)     ?? num(coldest.Temp_Aussen);
+  const hottestTagVal  = dailyMaxTempTag.get(hottestTag.Datum)   ?? num(hottestTag.Temp_Aussen);
+  const coldestNachtVal= dailyMinTempNacht.get(coldestNacht.Datum) ?? num(coldestNacht.Temp_Aussen);
+
+  const chartData = days.map(r => ({
+    tag: r.Datum.substring(0,5),
+    aussen: num(r.Temp_Aussen),
+    maxTag:   dailyMaxTempTag.get(r.Datum)   ?? null,
+    minTag:   dailyMinTempTag.get(r.Datum)   ?? null,
+    maxNacht: dailyMaxTempNacht.get(r.Datum) ?? null,
+    minNacht: dailyMinTempNacht.get(r.Datum) ?? null,
+    bewoelkung:num(r.Bewoelkung_Proz),
+    heizung:num(r.Heizung_kWh),
+    feucht:num(r.Luftfeuchte_Schlafzimmer_Proz),
+    _row:r
+  }));
   const click = (d:any) => { const r=d?.activePayload?.[0]?.payload?._row; if(r) onDayClick(r); };
   const axTick = { fontSize:9, fill:ac, fontWeight:700 };
 
   return (
     <div className="space-y-6">
       <HighlightStrip items={[
-        { icon:'🌡️', label:'Wärmster Tag',  value:`${fmt(num(hottest.Temp_Aussen))}°C`, sub:hottest.Datum },
-        { icon:'🥶', label:'Kältester Tag', value:`${fmt(num(coldest.Temp_Aussen))}°C`, sub:coldest.Datum },
-        { icon:'🔥', label:'Meiste Heizung',value:`${fmt(num(mostHeat.Heizung_kWh))} kWh`, sub:mostHeat.Datum },
-        { icon:'💧', label:'Ø Luftfeuchte', value:`${fmt(avgHumid,0)}%`, sub:'Schlafzimmer' },
+        { icon:'🌡️', label:'Wärmster Tag (Tagmax)',  value:`${fmt(hottestVal)}°C`,   sub:hottest.Datum },
+        { icon:'🥶', label:'Kältester Tag (Tagmin)',  value:`${fmt(coldestVal)}°C`,   sub:coldest.Datum },
+        { icon:'☀️', label:'Wärmste Tagzeit (07–22)', value:`${fmt(hottestTagVal)}°C`, sub:hottestTag.Datum },
+        { icon:'🌙', label:'Kälteste Nacht (22–07)',  value:`${fmt(coldestNachtVal)}°C`, sub:coldestNacht.Datum },
       ]} />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label:'Außen aktuell',   val:`${fmt(num(latest.Temp_Aussen))}°`,         sub:`☁️ ${latest.Bewoelkung_Proz}%`, color:'text-sky-600' },
-          { label:'Wasserbett Papa', val:`${fmt(num(latest.Temp_Wasserbett_Papa))}°`, sub:'Temperatur', color:'text-pink-600' },
-          { label:'Wasserbett Mama', val:`${fmt(num(latest.Temp_Wasserbett_Mama))}°`, sub:'Temperatur', color:'text-pink-500' },
-          { label:'Luftfeuchte SZ',  val:`${latest.Luftfeuchte_Schlafzimmer_Proz}%`, sub:'Schlafzimmer', color:'text-teal-600' },
+          { label:'Außen aktuell',  val:`${fmt(num(latest.Temp_Aussen))}°`,          sub:`☁️ ${latest.Bewoelkung_Proz}%`,   color:'text-sky-600' },
+          { label:'Wasserbett Papa',val:`${fmt(num(latest.Temp_Wasserbett_Papa))}°`,  sub:'Temperatur',                         color:'text-pink-600' },
+          { label:'Wasserbett Mama',val:`${fmt(num(latest.Temp_Wasserbett_Mama))}°`,  sub:'Temperatur',                         color:'text-pink-500' },
+          { label:'Luftfeuchte SZ', val:`${latest.Luftfeuchte_Schlafzimmer_Proz}%`, sub:'Schlafzimmer',                        color:'text-teal-600' },
         ].map((b,i) => (
           <div key={i} className={`${t('bg-slate-800/60 border-slate-700/50','bg-white border-gray-200')} border rounded-2xl p-5 text-center`}>
             <div className={`text-[9px] uppercase font-black mb-1 ${t('text-slate-500','text-gray-400')}`}>{b.label}</div>
@@ -527,16 +657,32 @@ function TemperaturenTab({ days, onDayClick }: { days: EnergyData[]; onDayClick:
         ))}
       </div>
       <Card>
-        <SectionHeader>Außentemperatur & Bewölkung — klicken für Details</SectionHeader>
-        <ResponsiveContainer width="100%" height={220}>
+        <SectionHeader>Außentemperatur: Tag- und Nacht-Maximum/Minimum</SectionHeader>
+        <div className={`text-[9px] mb-2 ${t('text-slate-500','text-gray-400')}`}>☀️ Tag 07–22 Uhr · 🌙 Nacht 22–07 Uhr</div>
+        <ResponsiveContainer width="100%" height={240}>
           <LineChart data={chartData} onClick={click} style={{cursor:'pointer'}}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
             <XAxis dataKey="tag" tick={axTick} axisLine={false} tickLine={false} />
-            <YAxis yAxisId="temp"  tick={axTick} axisLine={false} tickLine={false} unit="°" width={35} />
+            <YAxis tick={axTick} axisLine={false} tickLine={false} unit="°" width={35} />
+            <Tooltip contentStyle={ts} formatter={(v: any) => v !== null ? [`${fmt(Number(v))}°C`] : ['–']} />
+            <Line type="monotone" dataKey="maxTag"   name="Max Tag ☀️"   stroke="#f59e0b" strokeWidth={2} dot={false} connectNulls />
+            <Line type="monotone" dataKey="minTag"   name="Min Tag ☀️"   stroke="#fbbf24" strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
+            <Line type="monotone" dataKey="maxNacht" name="Max Nacht 🌙" stroke="#6366f1" strokeWidth={2} dot={false} connectNulls />
+            <Line type="monotone" dataKey="minNacht" name="Min Nacht 🌙" stroke="#818cf8" strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
+          </LineChart>
+        </ResponsiveContainer>
+      </Card>
+      <Card>
+        <SectionHeader>Außentemperatur & Bewölkung — klicken für Details</SectionHeader>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={chartData} onClick={click} style={{cursor:'pointer'}}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
+            <XAxis dataKey="tag" tick={axTick} axisLine={false} tickLine={false} />
+            <YAxis yAxisId="temp" tick={axTick} axisLine={false} tickLine={false} unit="°" width={35} />
             <YAxis yAxisId="cloud" orientation="right" tick={axTick} axisLine={false} tickLine={false} unit="%" width={35} />
             <Tooltip contentStyle={ts} />
-            <Line yAxisId="temp"  type="monotone" dataKey="aussen"    name="Außentemp" stroke="#38bdf8" strokeWidth={2} dot={false} />
-            <Line yAxisId="cloud" type="monotone" dataKey="bewoelkung"name="Bewölkung" stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 2" dot={false} />
+            <Line yAxisId="temp"  type="monotone" dataKey="aussen"     name="Außentemp"  stroke="#38bdf8" strokeWidth={2} dot={false} />
+            <Line yAxisId="cloud" type="monotone" dataKey="bewoelkung" name="Bewölkung"  stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 2" dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </Card>
@@ -572,7 +718,6 @@ function TemperaturenTab({ days, onDayClick }: { days: EnergyData[]; onDayClick:
     </div>
   );
 }
-
 // ─── Tagesansicht Tab ─────────────────────────────────────────────────────────
 
 const TABLE_COLS: { label: string; key: keyof EnergyData; unit: string; color: string }[] = [
@@ -879,7 +1024,13 @@ export default function Dashboard() {
                 };
                 const bestAutarky = days.reduce((b,r) => autarkyDay(r)>autarkyDay(b)?r:b, days[0]);
                 // Wärmster Tag
-                const hottestDay = days.reduce((b,r) => num(r.Temp_Aussen)>num(b.Temp_Aussen)?r:b, days[0]);
+                const _ovMaxTemp = getDailyMaxTemp(monthRows);
+        const hottestDay = days.reduce((b, r) => {
+          const mxB = _ovMaxTemp.get(b.Datum) ?? num(b.Temp_Aussen);
+          const mxR = _ovMaxTemp.get(r.Datum) ?? num(r.Temp_Aussen);
+          return mxR > mxB ? r : b;
+        }, days[0]);
+        const _hottestDayVal = _ovMaxTemp.get(hottestDay?.Datum ?? '') ?? num(hottestDay?.Temp_Aussen ?? '');
                 // Meiste Einspeisung
                 const bestFeed = days.reduce((b,r) => num(r.Netz_Einspeisung_kWh)>num(b.Netz_Einspeisung_kWh)?r:b, days[0]);
                 // Roboter Gesamtfläche
@@ -897,7 +1048,7 @@ export default function Dashboard() {
                   { icon:'💸', label:'Günstigster Tag',    value: eur(num(cheapDay?.Kosten_Euro)),            sub: cheapDay?.Datum },
                 ];
                 const row2 = [
-                  { icon:'🌡️', label:'Wärmster Tag',       value:`${fmt(num(hottestDay?.Temp_Aussen))}°C`,   sub: hottestDay?.Datum },
+                  { icon:'🌡️', label:'Wärmster Tag',       value:`${fmt(_hottestDayVal)}°C`,   sub: hottestDay?.Datum },
                   { icon:'⬆️', label:'Meist Eingespeist',  value:`${fmt(num(bestFeed?.Netz_Einspeisung_kWh))} kWh`, sub: bestFeed?.Datum },
                   { icon:'🧹', label:'Roboter Monat',      value:`${fmt(totalRobot,0)} m²`,                  sub:'Gesamtfläche' },
                   { icon:'🚗', label:'Meiste km/Tag',      value:`${fmt(mostKmDay.km,0)} km`,                sub: mostKmDay.datum?.substring(0,5) || '–' },
@@ -1043,7 +1194,7 @@ export default function Dashboard() {
 
           {activeTab === 'energie'      && <EnergieTab stats={stats} days={days} monthRows={monthRows} onDayClick={handleDayClick} />}
           {activeTab === 'auto'         && <AutoTab    stats={stats} days={days} onDayClick={handleDayClick} />}
-          {activeTab === 'temperaturen' && <TemperaturenTab days={days} onDayClick={handleDayClick} />}
+          {activeTab === 'temperaturen' && <TemperaturenTab days={days} monthRows={monthRows} onDayClick={handleDayClick} />}
           {activeTab === 'tagesansicht' && (
             <TagesansichtTab monthRows={monthRows} days={days} selectedDay={selectedDay} setSelectedDay={setSelectedDay} />
           )}
