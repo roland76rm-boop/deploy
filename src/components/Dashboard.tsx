@@ -92,6 +92,7 @@ interface EnergyData {
   Buero_Kueche_kWh: string; Gaming_buero_kWh: string; Gefrierschrank_kWh: string;
   Geschirrspueler_kWh: string; Kuehlschrank_kWh: string; TV_WZ_kWh: string;
   Waschmaschine_kWh: string;
+  E_Auto_PV_kWh: string; E_Auto_Netz_kWh: string; E_Auto_Akku_kWh: string;
 }
 
 type TabId = 'uebersicht' | 'energie' | 'auto' | 'temperaturen' | 'tagesansicht';
@@ -134,13 +135,15 @@ function getMonthStats(days: EnergyData[]) {
   const totalPV = sum('PV_Ertrag_kWh'), totalGrid = sum('Netzbezug_kWh'), totalFeed = sum('Netz_Einspeisung_kWh');
   const totalCharge = sum('Akku_Geladen_kWh'), totalDischarge = sum('Akku_Entladen_kWh');
   const totalHeat = sum('Heizung_kWh'), totalCar = sum('E_Auto_Ladung_kWh'), totalKosten = sum('Kosten_Euro');
+  const totalCarPV = sum('E_Auto_PV_kWh'), totalCarNetz = sum('E_Auto_Netz_kWh'), totalCarAkku = sum('E_Auto_Akku_kWh');
   const firstKm = num(days[0]?.Auto_Kilometerstand), lastKm = num(days[days.length-1]?.Auto_Kilometerstand);
   const totalKm = Math.max(0, lastKm - firstKm);
   const totalSelf = totalPV + totalDischarge, totalAll = totalSelf + totalGrid;
   const autarky = totalAll > 0 ? (totalSelf / totalAll) * 100 : 0;
   const feedRevenue = totalFeed * 0.08, pvSavings = (totalPV - totalFeed) * 0.28;
   return { totalPV, totalGrid, totalFeed, totalCharge, totalDischarge, totalHeat, totalCar, totalKm, totalKosten,
-    autarky, feedRevenue, pvSavings, netBalance: pvSavings + feedRevenue - totalKosten, daysCount: n };
+    autarky, feedRevenue, pvSavings, netBalance: pvSavings + feedRevenue - totalKosten, daysCount: n,
+    totalCarPV, totalCarNetz, totalCarAkku };
 }
 
 function generateInsights(stats: ReturnType<typeof getMonthStats>, days: EnergyData[]): string[] {
@@ -433,7 +436,8 @@ function AutoTab({ stats, days, onDayClick }: {
   const kmByDay = days.map((r,i) => ({
     tag: r.Datum.substring(0,5),
     km: i===0 ? 0 : Math.max(0, num(r.Auto_Kilometerstand) - num(days[i-1].Auto_Kilometerstand)),
-    laden: num(r.E_Auto_Ladung_kWh), reichweite: num(r.Auto_Reichweite_km), _row: r,
+    laden: num(r.E_Auto_Ladung_kWh), reichweite: num(r.Auto_Reichweite_km),
+    pv: num(r.E_Auto_PV_kWh), netz: num(r.E_Auto_Netz_kWh), akku: num(r.E_Auto_Akku_kWh), _row: r,
   }));
   const mostKmE  = kmByDay.reduce((b,r) => r.km > b.km ? r : b, kmByDay[0]);
   const mostCharge = days.reduce((b,r) => num(r.E_Auto_Ladung_kWh) > num(b.E_Auto_Ladung_kWh) ? r : b, days[0]);
@@ -455,6 +459,37 @@ function AutoTab({ stats, days, onDayClick }: {
         <StatCard label="Ø Verbrauch"   value={stats.totalKm>0?fmt(stats.totalCar/stats.totalKm*100,1):'–'} unit="kWh/100km" icon="📊" color={cc('slate')} sub="Effizienz" />
         <StatCard label="Reichweite"    value={latest.Auto_Reichweite_km||'–'} unit="km" icon="🔋" color={cc('teal')}  sub="Aktuell" />
       </div>
+      <Card>
+        <SectionHeader>Ladequellen (Monat)</SectionHeader>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className={`rounded-xl p-3 text-center ${t('bg-amber-500/10','bg-amber-50')}`}>
+            <div className="text-[10px] uppercase font-black text-amber-500 mb-1">☀️ PV</div>
+            <div className="text-xl font-black text-amber-400">{fmt(stats.totalCarPV)} <span className="text-xs">kWh</span></div>
+            <div className={`text-[10px] mt-1 ${t('text-slate-400','text-gray-500')}`}>{stats.totalCar>0?fmt(stats.totalCarPV/stats.totalCar*100,0):'0'}%</div>
+          </div>
+          <div className={`rounded-xl p-3 text-center ${t('bg-red-500/10','bg-red-50')}`}>
+            <div className="text-[10px] uppercase font-black text-red-400 mb-1">🔌 Netz</div>
+            <div className="text-xl font-black text-red-400">{fmt(stats.totalCarNetz)} <span className="text-xs">kWh</span></div>
+            <div className={`text-[10px] mt-1 ${t('text-slate-400','text-gray-500')}`}>{stats.totalCar>0?fmt(stats.totalCarNetz/stats.totalCar*100,0):'0'}%</div>
+          </div>
+          <div className={`rounded-xl p-3 text-center ${t('bg-violet-500/10','bg-violet-50')}`}>
+            <div className="text-[10px] uppercase font-black text-violet-400 mb-1">🔋 Akku</div>
+            <div className="text-xl font-black text-violet-400">{fmt(stats.totalCarAkku)} <span className="text-xs">kWh</span></div>
+            <div className={`text-[10px] mt-1 ${t('text-slate-400','text-gray-500')}`}>{stats.totalCar>0?fmt(stats.totalCarAkku/stats.totalCar*100,0):'0'}%</div>
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={kmByDay} barGap={2} onClick={click} style={{cursor:'pointer'}}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
+            <XAxis dataKey="tag" tick={axTick} axisLine={false} tickLine={false} />
+            <YAxis tick={axTick} axisLine={false} tickLine={false} unit=" kWh" width={45} />
+            <Tooltip contentStyle={ts} cursor={{fill:'#00000008'}} />
+            <Bar dataKey="pv"   name="PV"   stackId="q" fill="#f59e0b" radius={[0,0,0,0]} maxBarSize={18} />
+            <Bar dataKey="akku" name="Akku" stackId="q" fill="#8b5cf6" radius={[0,0,0,0]} maxBarSize={18} />
+            <Bar dataKey="netz" name="Netz" stackId="q" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={18} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
       <Card>
         <SectionHeader>Tages-km & Ladung — klicken für Details</SectionHeader>
         <ResponsiveContainer width="100%" height={220}>
@@ -1001,6 +1036,9 @@ export default function Dashboard() {
                   </div>
                   <div className={`divide-y ${t('divide-white/5','divide-gray-100')}`}>
                     <Pill label="Geladene Energie (Monat)" value={`${fmt(stats.totalCar)} kWh`}  color="text-blue-600" />
+                    <Pill label="☀️ davon PV"              value={`${fmt(stats.totalCarPV)} kWh`}  color="text-amber-500" />
+                    <Pill label="🔌 davon Netz"            value={`${fmt(stats.totalCarNetz)} kWh`} color="text-red-400" />
+                    <Pill label="🔋 davon Akku"            value={`${fmt(stats.totalCarAkku)} kWh`} color="text-violet-400" />
                     <Pill label="Gefahrene km (Monat)"     value={`${fmt(stats.totalKm,0)} km`}   color="text-blue-500" />
                     <Pill label="Kilometerstand"           value={`${parseInt(latest.Auto_Kilometerstand||'0').toLocaleString('de-AT')} km`} color={t('text-slate-300','text-gray-600')} />
                   </div>
