@@ -1086,13 +1086,17 @@ export default function Dashboard() {
         <header className={`sticky top-0 z-30 backdrop-blur border-b ${t('bg-slate-950/90 border-slate-800','bg-white/95 border-gray-200')}`}>
           <div className="max-w-7xl mx-auto px-4 h-auto py-3 flex flex-wrap items-center justify-between gap-3">
             {/* Logo */}
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center text-lg shadow-lg shadow-emerald-500/20">⚡</div>
-              <div>
+            <button
+              onClick={() => { setActiveTab('uebersicht'); setSelectedDay(''); setHeuteFilter(false); setSelectedMonthKey(availableMonths[availableMonths.length-1] ?? ''); }}
+              className="flex items-center gap-3 flex-shrink-0 group"
+              title="Zurück zur Startseite"
+            >
+              <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center text-lg shadow-lg shadow-emerald-500/20 group-hover:bg-emerald-400 transition-colors">⚡</div>
+              <div className="text-left">
                 <h1 className={`text-sm font-black tracking-tight leading-none ${t('text-white','text-gray-900')}`}>Energie Dashboard</h1>
-                <p className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${t('text-emerald-400','text-emerald-600')}`}>Smart Home · Tirol</p>
+                <p className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${t('text-emerald-400','text-emerald-600')}`}>Haus 543</p>
               </div>
-            </div>
+            </button>
 
             {/* Controls right */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -1121,15 +1125,6 @@ export default function Dashboard() {
                   const [m,y] = mk.split('.');
                   return <option key={mk} value={mk}>{MONTHS_DE[parseInt(m)-1]} {y}</option>;
                 })}
-              </select>
-
-              {/* Day filter */}
-              <select value={selectedDay} onChange={e => handleDayFilter(e.target.value)}
-                className={`${selStyle} text-[11px] font-bold rounded-lg px-3 py-1.5 outline-none cursor-pointer`}>
-                <option value="">— Alle Tage —</option>
-                {days.map(d => (
-                  <option key={d.Datum} value={d.Datum}>{d.Datum.substring(0,5)} {d.Wochentag}</option>
-                ))}
               </select>
 
               {/* Dark mode toggle */}
@@ -1409,7 +1404,7 @@ export default function Dashboard() {
 
         <footer className="max-w-7xl mx-auto px-4 py-6 text-center">
           <p className={`text-[9px] font-bold uppercase tracking-widest ${t('text-slate-600','text-gray-300')}`}>
-            Haus Tirol · Smart Home Energy Dashboard · Daten via HomeAssistant
+            Haus 543 · Energy Dashboard · Daten via HomeAssistant
           </p>
         </footer>
 
