@@ -92,6 +92,7 @@ interface EnergyData {
   Buero_Kueche_kWh: string; Gaming_buero_kWh: string; Gefrierschrank_kWh: string;
   Geschirrspueler_kWh: string; Kuehlschrank_kWh: string; TV_WZ_kWh: string;
   Waschmaschine_kWh: string;
+  E_Auto_PV_kWh: string; E_Auto_Netz_kWh: string; E_Auto_Akku_kWh: string;
 }
 
 type TabId = 'uebersicht' | 'energie' | 'auto' | 'temperaturen' | 'tagesansicht';
@@ -212,12 +213,13 @@ function getMonthStats(days: EnergyData[]) {
   const totalPV = sum('PV_Ertrag_kWh'), totalGrid = sum('Netzbezug_kWh'), totalFeed = sum('Netz_Einspeisung_kWh');
   const totalCharge = sum('Akku_Geladen_kWh'), totalDischarge = sum('Akku_Entladen_kWh');
   const totalHeat = sum('Heizung_kWh'), totalCar = sum('E_Auto_Ladung_kWh'), totalKosten = sum('Kosten_Euro');
+  const totalCarPV = sum('E_Auto_PV_kWh'), totalCarNetz = sum('E_Auto_Netz_kWh'), totalCarAkku = sum('E_Auto_Akku_kWh');
   const firstKm = num(days[0]?.Auto_Kilometerstand), lastKm = num(days[days.length-1]?.Auto_Kilometerstand);
   const totalKm = Math.max(0, lastKm - firstKm);
   const totalSelf = totalPV + totalDischarge, totalAll = totalSelf + totalGrid;
   const autarky = totalAll > 0 ? (totalSelf / totalAll) * 100 : 0;
   const feedRevenue = totalFeed * 0.08, pvSavings = (totalPV - totalFeed) * 0.28;
-  return { totalPV, totalGrid, totalFeed, totalCharge, totalDischarge, totalHeat, totalCar, totalKm, totalKosten,
+  return { totalPV, totalGrid, totalFeed, totalCharge, totalDischarge, totalHeat, totalCar, totalCarPV, totalCarNetz, totalCarAkku, totalKm, totalKosten,
     autarky, feedRevenue, pvSavings, netBalance: pvSavings + feedRevenue - totalKosten, daysCount: n };
 }
 
@@ -504,7 +506,7 @@ function EnergieTab({ stats, days, monthRows, onDayClick }: {
 // ─── Auto Tab ─────────────────────────────────────────────────────────────────
 
 function AutoTab({ stats, days, onDayClick, prevDayKm = 0 }: {
-  stats: ReturnType<typeof getMonthStats>; days: EnergyData[]; onDayClick: (d: EnergyData) => void;
+  stats: ReturnType<typeof getMonthStats>; days: EnergyData[]; onDayClick: (d: EnergyData) => void; prevDayKm?: number;
 }) {
   const { t, ts, gc, ac, cc } = useTheme();
   if (!days.length) return <Card><p className={`text-center py-8 ${t('text-slate-500','text-gray-400')}`}>Keine Daten.</p></Card>;
@@ -512,13 +514,22 @@ function AutoTab({ stats, days, onDayClick, prevDayKm = 0 }: {
   const kmByDay = days.map((r,i) => ({
     tag: r.Datum.substring(0,5),
     km: i===0 ? Math.max(0, num(r.Auto_Kilometerstand) - prevDayKm) : Math.max(0, num(r.Auto_Kilometerstand) - num(days[i-1].Auto_Kilometerstand)),
-    laden: num(r.E_Auto_Ladung_kWh), reichweite: num(r.Auto_Reichweite_km), _row: r,
+    laden: num(r.E_Auto_Ladung_kWh),
+    ladePV:   num(r.E_Auto_PV_kWh),
+    ladeNetz: num(r.E_Auto_Netz_kWh),
+    ladeAkku: num(r.E_Auto_Akku_kWh),
+    reichweite: num(r.Auto_Reichweite_km), _row: r,
   }));
   const mostKmE  = kmByDay.reduce((b,r) => r.km > b.km ? r : b, kmByDay[0]);
   const mostCharge = days.reduce((b,r) => num(r.E_Auto_Ladung_kWh) > num(b.E_Auto_Ladung_kWh) ? r : b, days[0]);
   const latest   = days[days.length-1];
   const click    = (d: any) => { const r=d?.activePayload?.[0]?.payload?._row; if(r) onDayClick(r); };
   const axTick   = { fontSize:9, fill:ac, fontWeight:700 };
+
+  // Ladequellen-Summen für Prozent-Anzeige
+  const srcTotal = stats.totalCarPV + stats.totalCarNetz + stats.totalCarAkku;
+  const srcPct = (v: number) => srcTotal > 0 ? Math.round((v / srcTotal) * 100) : 0;
+  const hasSrcData = srcTotal > 0;
 
   return (
     <div className="space-y-6">
@@ -528,12 +539,25 @@ function AutoTab({ stats, days, onDayClick, prevDayKm = 0 }: {
         { icon:'🔋', label:'Aktuelle Reichweite',     value:`${latest.Auto_Reichweite_km} km`,         sub:'Jetzt' },
         { icon:'📍', label:'Kilometerstand',           value:`${parseInt(latest.Auto_Kilometerstand||'0').toLocaleString('de-AT')} km`, sub:'Odometer' },
       ]} />
+
+      {/* KPI-Kacheln */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Gefahrene km"  value={fmt(stats.totalKm,0)}   unit="km"       icon="🚗" color={cc('blue')}   sub={`∅ ${fmt(stats.totalKm/stats.daysCount,1)} km/Tag`} />
         <StatCard label="E-Auto Ladung" value={fmt(stats.totalCar)}    unit="kWh"      icon="⚡" color={cc('indigo')} sub={`∅ ${fmt(stats.totalCar/stats.daysCount)} kWh/Tag`} />
         <StatCard label="Ø Verbrauch"   value={stats.totalKm>0?fmt(stats.totalCar/stats.totalKm*100,1):'–'} unit="kWh/100km" icon="📊" color={cc('slate')} sub="Effizienz" />
         <StatCard label="Reichweite"    value={latest.Auto_Reichweite_km||'–'} unit="km" icon="🔋" color={cc('teal')}  sub="Aktuell" />
       </div>
+
+      {/* Ladequellen-Kacheln */}
+      {hasSrcData && (
+        <div className="grid grid-cols-3 gap-4">
+          <StatCard label="PV Direkt"    value={fmt(stats.totalCarPV)}   unit="kWh" icon="☀️" color={cc('amber')}  sub={`${srcPct(stats.totalCarPV)}% der Ladung`} />
+          <StatCard label="Tiwag (Netz)" value={fmt(stats.totalCarNetz)} unit="kWh" icon="🔌" color={cc('rose')}   sub={`${srcPct(stats.totalCarNetz)}% der Ladung`} />
+          <StatCard label="Akku"         value={fmt(stats.totalCarAkku)} unit="kWh" icon="🪫" color={cc('violet')} sub={`${srcPct(stats.totalCarAkku)}% der Ladung`} />
+        </div>
+      )}
+
+      {/* Tages-km & Gesamtladung */}
       <Card>
         <SectionHeader>Tages-km & Ladung — klicken für Details</SectionHeader>
         <ResponsiveContainer width="100%" height={220}>
@@ -548,6 +572,26 @@ function AutoTab({ stats, days, onDayClick, prevDayKm = 0 }: {
           </BarChart>
         </ResponsiveContainer>
       </Card>
+
+      {/* Ladequelle pro Tag (gestapelt) */}
+      {hasSrcData && (
+        <Card>
+          <SectionHeader>Ladequelle pro Tag — ☀️ PV · 🔌 Tiwag · 🪫 Akku</SectionHeader>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={kmByDay} barGap={2} onClick={click} style={{cursor:'pointer'}}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
+              <XAxis dataKey="tag" tick={axTick} axisLine={false} tickLine={false} />
+              <YAxis tick={axTick} axisLine={false} tickLine={false} unit=" kWh" width={45} />
+              <Tooltip contentStyle={ts} cursor={{fill:'#00000008'}} />
+              <Bar dataKey="ladePV"   name="☀️ PV Direkt"   fill="#f59e0b" radius={[0,0,0,0]} maxBarSize={20} stackId="src" />
+              <Bar dataKey="ladeAkku" name="🪫 Akku"         fill="#8b5cf6" radius={[0,0,0,0]} maxBarSize={20} stackId="src" />
+              <Bar dataKey="ladeNetz" name="🔌 Tiwag (Netz)" fill="#f43f5e" radius={[4,4,0,0]} maxBarSize={20} stackId="src" />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* Reichweite */}
       <Card>
         <SectionHeader>Reichweite (km)</SectionHeader>
         <ResponsiveContainer width="100%" height={160}>
@@ -1281,6 +1325,43 @@ export default function Dashboard() {
                     <Pill label="Gefahrene km (Monat)"     value={`${fmt(activeStats.totalKm,0)} km`}   color="text-blue-500" />
                     <Pill label="Kilometerstand"           value={`${parseInt(latest.Auto_Kilometerstand||'0').toLocaleString('de-AT')} km`} color={t('text-slate-300','text-gray-600')} />
                   </div>
+                  {/* Ladequellen-Breakdown */}
+                  {(() => {
+                    const pv   = activeStats.totalCarPV;
+                    const netz = activeStats.totalCarNetz;
+                    const akku = activeStats.totalCarAkku;
+                    const total = pv + netz + akku;
+                    if (total <= 0) return null;
+                    const pct = (v: number) => Math.round((v / total) * 100);
+                    return (
+                      <div className="mt-4">
+                        <div className={`text-[9px] font-black uppercase tracking-widest mb-2 ${t('text-slate-500','text-gray-400')}`}>Ladequellen diesen Monat</div>
+                        {/* Stacked progress bar */}
+                        <div className={`h-3 rounded-full overflow-hidden flex mb-2 ${t('bg-slate-700','bg-gray-200')}`}>
+                          <div className="bg-amber-400 h-full transition-all" style={{width:`${pct(pv)}%`}} />
+                          <div className="bg-violet-500 h-full transition-all" style={{width:`${pct(akku)}%`}} />
+                          <div className="bg-rose-500 h-full transition-all"   style={{width:`${pct(netz)}%`}} />
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 text-[9px] font-bold text-center">
+                          <div>
+                            <span className="text-amber-500">☀️ PV</span>
+                            <div className={t('text-slate-300','text-gray-700')}>{fmt(pv)} kWh</div>
+                            <div className={`${t('text-slate-500','text-gray-400')}`}>{pct(pv)}%</div>
+                          </div>
+                          <div>
+                            <span className="text-violet-500">🪫 Akku</span>
+                            <div className={t('text-slate-300','text-gray-700')}>{fmt(akku)} kWh</div>
+                            <div className={`${t('text-slate-500','text-gray-400')}`}>{pct(akku)}%</div>
+                          </div>
+                          <div>
+                            <span className="text-rose-500">🔌 Tiwag</span>
+                            <div className={t('text-slate-300','text-gray-700')}>{fmt(netz)} kWh</div>
+                            <div className={`${t('text-slate-500','text-gray-400')}`}>{pct(netz)}%</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </section>
 
