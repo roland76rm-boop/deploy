@@ -95,7 +95,7 @@ interface EnergyData {
   E_Auto_PV_kWh: string; E_Auto_Netz_kWh: string; E_Auto_Akku_kWh: string;
 }
 
-type TabId = 'uebersicht' | 'energie' | 'auto' | 'temperaturen' | 'tagesansicht';
+type TabId = 'uebersicht' | 'energie' | 'auto' | 'temperaturen' | 'tagesansicht' | 'monatsvergleich';
 
 interface LightboxData { title: string; day: EnergyData; monthAvg: Record<string, number>; }
 
@@ -922,14 +922,178 @@ function TagesansichtTab({ monthRows, days, onDayClick, heuteFilter = false }: {
   );
 }
 
+// ─── MonatsvergleichTab ───────────────────────────────────────────────────────
+
+function MonatsvergleichTab({ allData }: { allData: EnergyData[] }) {
+  const { t, ts, gc, ac } = useTheme();
+  const axTick = { fontSize: 9, fill: ac, fontWeight: 700 };
+
+  const monthlyStats = useMemo(() => {
+    const monthMap = new Map<string, EnergyData[]>();
+    for (const row of allData) {
+      const [, m, y] = row.Datum.split('.');
+      const key = `${m}.${y}`;
+      if (!monthMap.has(key)) monthMap.set(key, []);
+      monthMap.get(key)!.push(row);
+    }
+    const sorted = Array.from(monthMap.keys()).sort((a, b) => {
+      const [am, ay] = a.split('.').map(Number), [bm, by] = b.split('.').map(Number);
+      return ay !== by ? ay - by : am - bm;
+    });
+    return sorted.map(key => {
+      const [m, y] = key.split('.');
+      const days = getDailyFinal(monthMap.get(key)!);
+      const s = getMonthStats(days);
+      const label = `${MONTHS_DE[parseInt(m) - 1].substring(0, 3)} ${y.substring(2)}`;
+      return { key, label, ...s };
+    });
+  }, [allData]);
+
+  if (!monthlyStats.length) return null;
+
+  const energieData = monthlyStats.map(m => ({
+    monat: m.label, PV: +m.totalPV.toFixed(1), Netz: +m.totalGrid.toFixed(1), Einsp: +m.totalFeed.toFixed(1),
+  }));
+  const kostenData = monthlyStats.map(m => ({
+    monat: m.label, Kosten: +m.totalKosten.toFixed(2), Autarkie: +m.autarky.toFixed(0),
+  }));
+  const autoData = monthlyStats.map(m => ({
+    monat: m.label, km: +m.totalKm.toFixed(0), Ladung: +m.totalCar.toFixed(1),
+  }));
+  const heizungData = monthlyStats.map(m => ({
+    monat: m.label, Heizung: +m.totalHeat.toFixed(1),
+  }));
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className={`text-xl font-black ${t('text-white', 'text-gray-900')}`}>Monatsvergleich</h2>
+        <p className={`text-xs mt-1 ${t('text-slate-400', 'text-gray-500')}`}>{monthlyStats.length} Monate verfügbar</p>
+      </div>
+
+      {/* PV · Netzbezug · Einspeisung */}
+      <Card>
+        <SectionHeader>PV · Netzbezug · Einspeisung (kWh / Monat)</SectionHeader>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={energieData} barGap={2} barCategoryGap="25%">
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
+            <XAxis dataKey="monat" tick={axTick} axisLine={false} tickLine={false} />
+            <YAxis tick={axTick} axisLine={false} tickLine={false} unit=" kWh" width={52} />
+            <Tooltip contentStyle={ts} />
+            <Bar dataKey="PV" name="PV Ertrag" fill="#10b981" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="Netz" name="Netzbezug" fill="#ef4444" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="Einsp" name="Einspeisung" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Kosten + Autarkie */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <SectionHeader>Stromkosten (€ / Monat)</SectionHeader>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={kostenData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
+              <XAxis dataKey="monat" tick={axTick} axisLine={false} tickLine={false} />
+              <YAxis tick={axTick} axisLine={false} tickLine={false} unit=" €" width={42} />
+              <Tooltip contentStyle={ts} formatter={(v: number) => [`${v.toFixed(2)} €`, 'Kosten']} />
+              <Bar dataKey="Kosten" name="Stromkosten" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card>
+          <SectionHeader>Autarkiegrad (% / Monat)</SectionHeader>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={kostenData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
+              <XAxis dataKey="monat" tick={axTick} axisLine={false} tickLine={false} />
+              <YAxis tick={axTick} axisLine={false} tickLine={false} unit="%" width={36} domain={[0, 100]} />
+              <Tooltip contentStyle={ts} formatter={(v: number) => [`${v}%`, 'Autarkie']} />
+              <Bar dataKey="Autarkie" name="Autarkie" fill="#10b981" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      </div>
+
+      {/* E-Auto + Heizung */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <SectionHeader>E-Auto · km & Ladung / Monat</SectionHeader>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={autoData} barGap={2} barCategoryGap="25%">
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
+              <XAxis dataKey="monat" tick={axTick} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="km" tick={axTick} axisLine={false} tickLine={false} unit=" km" width={44} />
+              <YAxis yAxisId="kwh" orientation="right" tick={axTick} axisLine={false} tickLine={false} unit=" kWh" width={44} />
+              <Tooltip contentStyle={ts} />
+              <Bar yAxisId="km" dataKey="km" name="km gefahren" fill="#6366f1" radius={[3, 3, 0, 0]} />
+              <Bar yAxisId="kwh" dataKey="Ladung" name="Geladen kWh" fill="#a78bfa" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card>
+          <SectionHeader>Heizung (kWh / Monat)</SectionHeader>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={heizungData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gc} />
+              <XAxis dataKey="monat" tick={axTick} axisLine={false} tickLine={false} />
+              <YAxis tick={axTick} axisLine={false} tickLine={false} unit=" kWh" width={44} />
+              <Tooltip contentStyle={ts} />
+              <Bar dataKey="Heizung" name="Heizung" fill="#f97316" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      </div>
+
+      {/* Zusammenfassung Tabelle */}
+      <Card>
+        <SectionHeader>Alle Monate auf einen Blick</SectionHeader>
+        <div className="overflow-x-auto">
+          <table className={`w-full text-[11px] font-mono ${t('text-slate-300', 'text-gray-700')}`}>
+            <thead>
+              <tr className={`border-b ${t('border-slate-700', 'border-gray-200')}`}>
+                <th className="text-left py-2 pr-3 font-black">Monat</th>
+                <th className="text-right py-2 px-2 font-black">PV kWh</th>
+                <th className="text-right py-2 px-2 font-black">Netz kWh</th>
+                <th className="text-right py-2 px-2 font-black">Einsp. kWh</th>
+                <th className="text-right py-2 px-2 font-black">Kosten</th>
+                <th className="text-right py-2 px-2 font-black">Autarkie</th>
+                <th className="text-right py-2 px-2 font-black">Auto km</th>
+                <th className="text-right py-2 px-2 font-black">Auto kWh</th>
+                <th className="text-right py-2 px-2 font-black">Heizung</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthlyStats.map(m => (
+                <tr key={m.key} className={`border-b ${t('border-slate-800/50', 'border-gray-100')}`}>
+                  <td className="py-1.5 pr-3 font-bold">{m.label}</td>
+                  <td className="text-right px-2 text-emerald-400">{fmt(m.totalPV)}</td>
+                  <td className="text-right px-2 text-red-400">{fmt(m.totalGrid)}</td>
+                  <td className="text-right px-2 text-blue-400">{fmt(m.totalFeed)}</td>
+                  <td className="text-right px-2 text-amber-400">{eur(m.totalKosten)}</td>
+                  <td className="text-right px-2">{fmt(m.autarky, 0)}%</td>
+                  <td className="text-right px-2">{fmt(m.totalKm, 0)}</td>
+                  <td className="text-right px-2">{fmt(m.totalCar)}</td>
+                  <td className="text-right px-2">{fmt(m.totalHeat)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id:'uebersicht',   label:'Übersicht',   icon:'🏡' },
-  { id:'energie',      label:'Energie',      icon:'⚡' },
-  { id:'auto',         label:'Auto',         icon:'🚗' },
-  { id:'temperaturen', label:'Temperaturen', icon:'🌡️' },
-  { id:'tagesansicht', label:'Tagesansicht', icon:'📋' },
+  { id:'uebersicht',      label:'Übersicht',      icon:'🏡' },
+  { id:'energie',         label:'Energie',         icon:'⚡' },
+  { id:'auto',            label:'Auto',            icon:'🚗' },
+  { id:'temperaturen',    label:'Temperaturen',    icon:'🌡️' },
+  { id:'tagesansicht',    label:'Tagesansicht',    icon:'📋' },
+  { id:'monatsvergleich', label:'Monatsvergleich', icon:'📊' },
 ];
 
 export default function Dashboard() {
@@ -1394,12 +1558,13 @@ export default function Dashboard() {
             </div>
           )}
 
-          {activeTab === 'energie'      && <EnergieTab stats={activeStats} days={activeDays} monthRows={activeMonthRows} onDayClick={handleDayClick} />}
-          {activeTab === 'auto'         && <AutoTab stats={activeStats} days={activeDays} onDayClick={handleDayClick} prevDayKm={prevDayKm} />}
-          {activeTab === 'temperaturen' && <TemperaturenTab days={activeDays} monthRows={activeMonthRows} onDayClick={handleDayClick} />}
-          {activeTab === 'tagesansicht' && (
+          {activeTab === 'energie'         && <EnergieTab stats={activeStats} days={activeDays} monthRows={activeMonthRows} onDayClick={handleDayClick} />}
+          {activeTab === 'auto'            && <AutoTab stats={activeStats} days={activeDays} onDayClick={handleDayClick} prevDayKm={prevDayKm} />}
+          {activeTab === 'temperaturen'    && <TemperaturenTab days={activeDays} monthRows={activeMonthRows} onDayClick={handleDayClick} />}
+          {activeTab === 'tagesansicht'    && (
             <TagesansichtTab monthRows={activeMonthRows} days={activeDays} onDayClick={handleDayClick} heuteFilter={heuteFilter} />
           )}
+          {activeTab === 'monatsvergleich' && <MonatsvergleichTab allData={allData} />}
         </main>
 
         <footer className="max-w-7xl mx-auto px-4 py-6 text-center">
