@@ -593,6 +593,12 @@ function AutoTab({ stats, days, onDayClick, prevDayKm = 0 }: {
   const srcPct = (v: number) => srcTotal > 0 ? Math.round((v / srcTotal) * 100) : 0;
   const hasSrcData = srcTotal > 0;
 
+  // Sommertarif-Ersparnis für E-Auto Netz-Ladung
+  const carNetzSommertarifSavings = days.reduce((s, row) => {
+    if (!isSommer(row.Datum)) return s;
+    return s + num(row.E_Auto_Netz_kWh) * TARIFF.peakNetzbezugAnteil * (T_NORMAL - T_PEAK);
+  }, 0);
+
   return (
     <div className="space-y-6">
       <HighlightStrip items={[
@@ -614,7 +620,7 @@ function AutoTab({ stats, days, onDayClick, prevDayKm = 0 }: {
       {hasSrcData && (
         <div className="grid grid-cols-3 gap-4">
           <StatCard label="PV Direkt"    value={fmt(stats.totalCarPV)}   unit="kWh" icon="☀️" color={cc('amber')}  sub={`${srcPct(stats.totalCarPV)}% der Ladung`} />
-          <StatCard label="Tiwag (Netz)" value={fmt(stats.totalCarNetz)} unit="kWh" icon="🔌" color={cc('rose')}   sub={`${srcPct(stats.totalCarNetz)}% der Ladung`} />
+          <StatCard label="Tiwag (Netz)" value={fmt(stats.totalCarNetz)} unit="kWh" icon="🔌" color={cc('rose')}   sub={carNetzSommertarifSavings > 0.01 ? `${srcPct(stats.totalCarNetz)}% der Ladung · 🌞 ${eur(carNetzSommertarifSavings)} Sommer-Rabatt` : `${srcPct(stats.totalCarNetz)}% der Ladung`} />
           <StatCard label="Akku"         value={fmt(stats.totalCarAkku)} unit="kWh" icon="🪫" color={cc('violet')} sub={`${srcPct(stats.totalCarAkku)}% der Ladung`} />
         </div>
       )}
