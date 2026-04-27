@@ -125,7 +125,7 @@ const TARIFF = {
   // Einspeisevergütung brutto (OeMAG)
   einspeisungBrutto:   0.08,
   // Sommertarif: Monate Mai–September (PV-Saison)
-  sommerMonate:        [5, 6, 7, 8, 9] as number[],
+  sommerMonate:        [4, 5, 6, 7, 8, 9, 10] as number[],
   // Anteil Netzbezug in Peak-Stunden (10–16): PV+Akku decken Spitze → Schätzung 15%
   peakNetzbezugAnteil: 0.15,
   // Anteil PV-Eigenverbrauch direkt in Peak-Stunden (restliche 50% → Akku → Nachts normal)
