@@ -110,6 +110,58 @@ const fmt  = (v: number, d = 1) => v.toFixed(d);
 const eur  = (v: number) => v.toFixed(2) + ' €';
 const MONTHS_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 
+// ─── Tarif-Konfiguration TIWAG 2025 ──────────────────────────────────────────
+// Quellen: TIWAG-Rechnung Nr. 240204632 (Nov 2022 – Nov 2023) + aktuelle Preisinfo
+const TARIFF = {
+  // TIWAG Arbeitspreis netto ct/kWh
+  arbeitNormalNetto:   0.09,    // 9,0 ct/kWh (Normal)
+  arbeitPeakNetto:     0.045,   // 4,5 ct/kWh (Sommer 10–16 Uhr, -50% Rabatt)
+  // Netz-Arbeitskosten netto (aus Netzrechnung)
+  netzVariabelNetto:   0.05724, // Netznutzung 5,02 + Netzverluste 0,60 + Elektr.Abgabe 0,10 ct
+  // Fixkosten gesamt pro Jahr netto (Netz-GP 36 + Messpreis 28,80 + Lieferant-GP 20 €)
+  fixkostenJahrNetto:  84.80,
+  // MwSt 20%
+  mwst:                1.20,
+  // Einspeisevergütung brutto (OeMAG)
+  einspeisungBrutto:   0.08,
+  // Sommertarif: Monate Mai–September (PV-Saison)
+  sommerMonate:        [5, 6, 7, 8, 9] as number[],
+  // Anteil Netzbezug in Peak-Stunden (10–16): PV+Akku decken Spitze → Schätzung 15%
+  peakNetzbezugAnteil: 0.15,
+  // Anteil PV-Eigenverbrauch direkt in Peak-Stunden (restliche 50% → Akku → Nachts normal)
+  peakPvEigenAnteil:   0.50,
+} as const;
+
+// Abgeleitete Preise brutto (€/kWh bzw. €/Tag)
+const T_NORMAL = (TARIFF.arbeitNormalNetto + TARIFF.netzVariabelNetto) * TARIFF.mwst; // ~17,7 ct/kWh
+const T_PEAK   = (TARIFF.arbeitPeakNetto   + TARIFF.netzVariabelNetto) * TARIFF.mwst; // ~12,3 ct/kWh
+const T_FIX    = (TARIFF.fixkostenJahrNetto / 365) * TARIFF.mwst;                     // ~0,28 €/Tag
+
+/** Liegt das Datum im Sommertarif (Mai–September)? */
+function isSommer(datum: string): boolean {
+  return TARIFF.sommerMonate.includes(parseInt(datum.split('.')[1] ?? '0'));
+}
+
+/** Tageskosten berechnen: Netzbezug × saisonaler Tarif + Fixkosten */
+function calcDayCost(row: EnergyData): number {
+  const grid = num(row.Netzbezug_kWh);
+  const rate = isSommer(row.Datum)
+    ? TARIFF.peakNetzbezugAnteil * T_PEAK + (1 - TARIFF.peakNetzbezugAnteil) * T_NORMAL
+    : T_NORMAL;
+  return grid * rate + T_FIX;
+}
+
+/** PV-Ersparnis berechnen: vermiedener Netzbezug durch Eigenverbrauch */
+function calcPvSavings(days: EnergyData[]): number {
+  return days.reduce((sum, row) => {
+    const selfConsumed = Math.max(0, num(row.PV_Ertrag_kWh) - num(row.Netz_Einspeisung_kWh));
+    if (isSommer(row.Datum)) {
+      return sum + selfConsumed * (TARIFF.peakPvEigenAnteil * T_PEAK + (1 - TARIFF.peakPvEigenAnteil) * T_NORMAL);
+    }
+    return sum + selfConsumed * T_NORMAL;
+  }, 0);
+}
+
 function getDailyFinal(rows: EnergyData[]): EnergyData[] {
   const map = new Map<string, EnergyData>();
   for (const row of rows) map.set(row.Datum, row);
@@ -212,15 +264,21 @@ function getMonthStats(days: EnergyData[]) {
   const sum = (k: keyof EnergyData) => days.reduce((s, r) => s + num(r[k] as string), 0);
   const totalPV = sum('PV_Ertrag_kWh'), totalGrid = sum('Netzbezug_kWh'), totalFeed = sum('Netz_Einspeisung_kWh');
   const totalCharge = sum('Akku_Geladen_kWh'), totalDischarge = sum('Akku_Entladen_kWh');
-  const totalHeat = sum('Heizung_kWh'), totalCar = sum('E_Auto_Ladung_kWh'), totalKosten = sum('Kosten_Euro');
+  const totalHeat = sum('Heizung_kWh'), totalCar = sum('E_Auto_Ladung_kWh');
   const totalCarPV = sum('E_Auto_PV_kWh'), totalCarNetz = sum('E_Auto_Netz_kWh'), totalCarAkku = sum('E_Auto_Akku_kWh');
   const firstKm = num(days[0]?.Auto_Kilometerstand), lastKm = num(days[days.length-1]?.Auto_Kilometerstand);
   const totalKm = Math.max(0, lastKm - firstKm);
   const totalSelf = totalPV + totalDischarge, totalAll = totalSelf + totalGrid;
   const autarky = totalAll > 0 ? (totalSelf / totalAll) * 100 : 0;
-  const feedRevenue = totalFeed * 0.08, pvSavings = (totalPV - totalFeed) * 0.28;
+  // Kosten: saisonal berechnet (Sommertarif berücksichtigt) statt fixem Mischpreis
+  const totalKosten = days.reduce((s, r) => s + calcDayCost(r), 0);
+  // Vergleich: was hätte der alte Mischpreis (25 ct flat) ergeben?
+  const totalKostenFlat = totalGrid * 0.25 + n * T_FIX;
+  const sommertarifSparnis = Math.max(0, totalKostenFlat - totalKosten);
+  const feedRevenue = totalFeed * TARIFF.einspeisungBrutto;
+  const pvSavings   = calcPvSavings(days);
   return { totalPV, totalGrid, totalFeed, totalCharge, totalDischarge, totalHeat, totalCar, totalCarPV, totalCarNetz, totalCarAkku, totalKm, totalKosten,
-    autarky, feedRevenue, pvSavings, netBalance: pvSavings + feedRevenue - totalKosten, daysCount: n };
+    autarky, feedRevenue, pvSavings, sommertarifSparnis, netBalance: pvSavings + feedRevenue - totalKosten, daysCount: n };
 }
 
 function generateInsights(stats: ReturnType<typeof getMonthStats>, days: EnergyData[]): string[] {
@@ -237,10 +295,14 @@ function generateInsights(stats: ReturnType<typeof getMonthStats>, days: EnergyD
   if (avgHeat > 12) insights.push(`🔥 Hoher Heizungsverbrauch: ∅ ${fmt(avgHeat)} kWh/Tag – kalte Jahreszeit.`);
   else if (avgHeat < 2 && avgHeat > 0) insights.push(`🌿 Niedriger Heizungsverbrauch: ∅ ${fmt(avgHeat)} kWh/Tag.`);
   if (stats.totalKm > 0) insights.push(`🚗 E-Auto: ${fmt(stats.totalKm,0)} km gefahren, ${fmt(stats.totalCar)} kWh geladen${stats.totalKm>0 ? `, ∅ ${fmt(stats.totalCar/stats.totalKm*100,1)} kWh/100km` : ''}.`);
+  // Sommertarif-Insight
+  if (stats.sommertarifSparnis > 0.01) {
+    insights.push(`🌞 Sommertarif (10–16 Uhr): ${eur(stats.sommertarifSparnis)} Ersparnis gegenüber Normaltarif – 50% TIWAG-Rabatt aktiv.`);
+  }
   const avgCost = stats.totalKosten / n;
-  const highDay = days.find(r => num(r.Kosten_Euro) > avgCost * 2.5);
-  if (highDay) insights.push(`❗ Kostenspitze am ${highDay.Datum}: ${eur(num(highDay.Kosten_Euro))} (∅ ${eur(avgCost)}/Tag).`);
-  return insights.slice(0, 5);
+  const highDay = days.find(r => calcDayCost(r) > avgCost * 2.5);
+  if (highDay) insights.push(`❗ Kostenspitze am ${highDay.Datum}: ${eur(calcDayCost(highDay))} (∅ ${eur(avgCost)}/Tag).`);
+  return insights.slice(0, 6);
 }
 
 // ─── Small UI Components ──────────────────────────────────────────────────────
@@ -394,11 +456,11 @@ function EnergieTab({ stats, days, monthRows, onDayClick }: {
 
   const bestPV   = days.reduce((b,r) => num(r.PV_Ertrag_kWh) > num(b.PV_Ertrag_kWh) ? r : b, days[0]);
   const mostGrid = days.reduce((b,r) => num(r.Netzbezug_kWh) > num(b.Netzbezug_kWh) ? r : b, days[0]);
-  const lowestCost = days.reduce((b,r) => num(r.Kosten_Euro) < num(b.Kosten_Euro) ? r : b, days[0]);
+  const lowestCost = days.reduce((b,r) => calcDayCost(r) < calcDayCost(b) ? r : b, days[0]);
   const highFeed = days.reduce((b,r) => num(r.Netz_Einspeisung_kWh) > num(b.Netz_Einspeisung_kWh) ? r : b, days[0]);
 
   const chartData = days.map(r => ({ tag: r.Datum.substring(0,5), PV: num(r.PV_Ertrag_kWh), Netz: num(r.Netzbezug_kWh),
-    Einspeisung: num(r.Netz_Einspeisung_kWh), Kosten: num(r.Kosten_Euro),
+    Einspeisung: num(r.Netz_Einspeisung_kWh), Kosten: calcDayCost(r),
     Akku: dailyMaxSOC.get(r.Datum) ?? num(r.Speicher_Inhalt_SOC_kWh), _row: r }));
 
   const appData = [
@@ -1326,19 +1388,28 @@ export default function Dashboard() {
                   Monatsübersicht · {activeLabel} · {activeStats.daysCount} Tage erfasst
                 </h2>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <StatCard label="Stromkosten"  value={fmt(activeStats.totalKosten,2)} unit="€"   icon="🧾" color={cc('rose')}    sub={`∅ ${fmt(activeStats.totalKosten/activeStats.daysCount,2)} €/Tag`} />
+                  <StatCard label="Stromkosten"  value={fmt(activeStats.totalKosten,2)} unit="€"   icon="🧾" color={cc('rose')}    sub={`∅ ${fmt(activeStats.totalKosten/activeStats.daysCount,2)} €/Tag · ${fmt(activeStats.totalGrid > 0 ? activeStats.totalKosten/activeStats.totalGrid*100 : 0, 1)} ct/kWh`} />
                   <StatCard label="PV Ertrag"    value={fmt(activeStats.totalPV)}       unit="kWh"  icon="☀️" color={cc('amber')}   sub={`∅ ${fmt(activeStats.totalPV/activeStats.daysCount)} kWh/Tag`} />
                   <StatCard label="Autarkiegrad" value={fmt(activeStats.autarky,0)}     unit="%"    icon="🏡" color={cc(activeStats.autarky>=50?'emerald':'slate')} sub={`Netzbezug ${fmt(activeStats.totalGrid)} kWh`} />
                   <StatCard label="PV-Ersparnis" value={fmt(activeStats.pvSavings,2)}   unit="€"    icon="💰" color={cc('green')}   sub={`+ ${fmt(activeStats.feedRevenue,2)} € Einspeisung`} />
                 </div>
+                {activeStats.sommertarifSparnis > 0.01 && (
+                  <div className={`mt-3 flex items-center gap-3 px-4 py-2.5 rounded-xl border ${t('bg-amber-950/30 border-amber-700/30 text-amber-300','bg-amber-50 border-amber-200 text-amber-800')}`}>
+                    <span className="text-base">🌞</span>
+                    <div className="text-[11px] font-bold">
+                      Sommertarif aktiv (10–16 Uhr): TIWAG-Rabatt spart <span className="font-black">{eur(activeStats.sommertarifSparnis)}</span> gegenüber Normaltarif
+                      <span className={`ml-2 text-[10px] font-normal ${t('text-amber-400/70','text-amber-600/70')}`}>Normal 17,7 ct · Peak 12,3 ct/kWh</span>
+                    </div>
+                  </div>
+                )}
               </section>
 
               {/* ── Monats-Highlights ── */}
               {(() => {
                 // Bester PV-Tag
                 const bestPV = activeDays.reduce((b,r) => num(r.PV_Ertrag_kWh)>num(b.PV_Ertrag_kWh)?r:b, activeDays[0]);
-                // Günstigster Tag
-                const cheapDay = activeDays.reduce((b,r) => num(r.Kosten_Euro)<num(b.Kosten_Euro)?r:b, activeDays[0]);
+                // Günstigster Tag (berechnet)
+                const cheapDay = activeDays.reduce((b,r) => calcDayCost(r)<calcDayCost(b)?r:b, activeDays[0]);
                 // Höchster Akku-Stand (Tagesmax)
                 const maxSOCEntry = activeDays.reduce((b,r) => {
                   const soc = activeDailyMaxSOC.get(r.Datum)??0;
@@ -1374,7 +1445,7 @@ export default function Dashboard() {
                   { icon:'☀️', label:'Bester PV-Tag',     value:`${fmt(num(bestPV?.PV_Ertrag_kWh))} kWh`,  sub: bestPV?.Datum },
                   { icon:'🔋', label:'Akku-Maximum',       value:`${fmt(maxSOCVal)} kWh`,                    sub: maxSOCEntry?.Datum },
                   { icon:'🏡', label:'Bester Autarkie-Tag',value:`${fmt(autarkyDay(bestAutarky),0)}%`,        sub: bestAutarky?.Datum },
-                  { icon:'💸', label:'Günstigster Tag',    value: eur(num(cheapDay?.Kosten_Euro)),            sub: cheapDay?.Datum },
+                  { icon:'💸', label:'Günstigster Tag',    value: eur(cheapDay ? calcDayCost(cheapDay) : 0), sub: cheapDay?.Datum },
                 ];
                 const row2 = [
                   { icon:'🌡️', label:'Wärmster Tag',       value:`${fmt(_hottestDayVal)}°C`,   sub: hottestDay?.Datum },
@@ -1422,12 +1493,19 @@ export default function Dashboard() {
                     <Pill label="Einspeisung"  value={`${fmt(activeStats.totalFeed)} kWh`}  color="text-sky-500" />
                     <Pill label="Akku geladen" value={`${fmt(activeStats.totalCharge)} kWh`}color="text-violet-500" />
                     <Pill label="Akku entladen"value={`${fmt(activeStats.totalDischarge)} kWh`}color="text-violet-400" />
+                    <Pill label="Netzkosten"   value={eur(activeStats.totalKosten)}          color="text-red-400" />
+                    <Pill label="PV-Ersparnis" value={eur(activeStats.pvSavings)}             color="text-emerald-500" />
+                    <Pill label="Einspeis-Erlös" value={eur(activeStats.feedRevenue)}         color="text-sky-400" />
+                    {activeStats.sommertarifSparnis > 0.01 && (
+                      <Pill label="🌞 Sommertarif-Bonus" value={eur(activeStats.sommertarifSparnis)} color="text-amber-400" />
+                    )}
                   </div>
                   <div className={`mt-4 p-3 rounded-xl text-center ${activeStats.netBalance>=0
                     ? t('bg-emerald-500/10 text-emerald-400','bg-emerald-100 text-emerald-700')
                     : t('bg-rose-500/10 text-rose-400','bg-rose-100 text-rose-700')}`}>
                     <div className="text-[10px] uppercase font-black tracking-widest opacity-60">Netto-Bilanz</div>
                     <div className="text-xl font-black mt-0.5">{activeStats.netBalance>=0?'+':''}{eur(activeStats.netBalance)}</div>
+                    <div className={`text-[9px] mt-0.5 opacity-50`}>PV-Ersparnis + Einspeisung – Netzkosten</div>
                   </div>
                 </div>
 
