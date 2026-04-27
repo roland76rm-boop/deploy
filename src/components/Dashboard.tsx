@@ -307,8 +307,8 @@ function generateInsights(stats: ReturnType<typeof getMonthStats>, days: EnergyD
 
 // ─── Small UI Components ──────────────────────────────────────────────────────
 
-function StatCard({ label, value, unit, icon, color, sub }: {
-  label: string; value: string; unit?: string; icon: string; color: string; sub?: string;
+function StatCard({ label, value, unit, icon, color, sub, sub2, value2, unit2 }: {
+  label: string; value: string; unit?: string; icon: string; color: string; sub?: string; sub2?: string; value2?: string; unit2?: string;
 }) {
   return (
     <div className={`rounded-2xl p-5 border flex flex-col gap-2 ${color}`}>
@@ -320,7 +320,14 @@ function StatCard({ label, value, unit, icon, color, sub }: {
         <span className="text-2xl font-black leading-none">{value}</span>
         {unit && <span className="text-sm font-bold opacity-60 mb-0.5">{unit}</span>}
       </div>
+      {value2 && (
+        <div className="flex items-end gap-1">
+          <span className="text-xl font-black leading-none">{value2}</span>
+          {unit2 && <span className="text-sm font-bold opacity-60 mb-0.5">{unit2}</span>}
+        </div>
+      )}
       {sub && <span className="text-xs opacity-50 font-medium">{sub}</span>}
+      {sub2 && <span className="text-xs font-bold opacity-80">{sub2}</span>}
     </div>
   );
 }
@@ -593,6 +600,14 @@ function AutoTab({ stats, days, onDayClick, prevDayKm = 0 }: {
   const srcPct = (v: number) => srcTotal > 0 ? Math.round((v / srcTotal) * 100) : 0;
   const hasSrcData = srcTotal > 0;
 
+  // Ladekosten E-Auto via Tiwag (saisonal)
+  const carNetzCost = days.reduce((s, row) => {
+    const rate = isSommer(row.Datum)
+      ? TARIFF.peakNetzbezugAnteil * T_PEAK + (1 - TARIFF.peakNetzbezugAnteil) * T_NORMAL
+      : T_NORMAL;
+    return s + num(row.E_Auto_Netz_kWh) * rate;
+  }, 0);
+
   // Sommertarif-Ersparnis für E-Auto Netz-Ladung
   const carNetzSommertarifSavings = days.reduce((s, row) => {
     if (!isSommer(row.Datum)) return s;
@@ -620,7 +635,9 @@ function AutoTab({ stats, days, onDayClick, prevDayKm = 0 }: {
       {hasSrcData && (
         <div className="grid grid-cols-3 gap-4">
           <StatCard label="PV Direkt"    value={fmt(stats.totalCarPV)}   unit="kWh" icon="☀️" color={cc('amber')}  sub={`${srcPct(stats.totalCarPV)}% der Ladung`} />
-          <StatCard label="Tiwag (Netz)" value={fmt(stats.totalCarNetz)} unit="kWh" icon="🔌" color={cc('rose')}   sub={carNetzSommertarifSavings > 0.01 ? `${srcPct(stats.totalCarNetz)}% der Ladung · 🌞 ${eur(carNetzSommertarifSavings)} Sommer-Rabatt` : `${srcPct(stats.totalCarNetz)}% der Ladung`} />
+          <StatCard label="Tiwag (Netz)" value={fmt(stats.totalCarNetz)} unit="kWh" icon="🔌" color={cc('rose')}
+            value2={carNetzSommertarifSavings > 0.01 ? `🌞 ${eur(carNetzSommertarifSavings)}` : undefined} unit2={carNetzSommertarifSavings > 0.01 ? 'gespart' : undefined}
+            sub={`${srcPct(stats.totalCarNetz)}% der Ladung · ${eur(carNetzCost)} Kosten`} />
           <StatCard label="Akku"         value={fmt(stats.totalCarAkku)} unit="kWh" icon="🪫" color={cc('violet')} sub={`${srcPct(stats.totalCarAkku)}% der Ladung`} />
         </div>
       )}
